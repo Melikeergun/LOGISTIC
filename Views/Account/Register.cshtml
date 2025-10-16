@@ -1,0 +1,53 @@
+﻿@{
+    Layout = "_PublicLayout";
+    var returnUrl = (ViewBag.ReturnUrl as string) ?? "/roles/choose";
+}
+<section class="card" style="max-width:520px;margin:auto">
+    <h2>Kayıt Ol</h2>
+
+    <form method="post" action="/account/register">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="returnUrl" value="@returnUrl" />
+
+        <div class="mb">
+            <label>Kullanıcı Adı</label>
+            <input name="username" autocomplete="username" required />
+        </div>
+
+        <div class="mb">
+            <label>Ad Soyad</label>
+            <input name="fullName" />
+        </div>
+
+        <div class="mb">
+            <label>Parola</label>
+            <input type="password" name="password" autocomplete="new-password" required />
+        </div>
+
+        <!--  (davet kodu ile) -->
+        <details class="mb">
+            <summary>Rol talep et (opsiyonel)</summary>
+            <div class="mb">
+                <label>Rol</label>
+                <select name="roleRequest">
+                    <option value="">(Varsayılan: Customer)</option>
+                    <option>Driver</option>
+                    <option>WarehouseOperator</option>
+                    <option>WarehouseManager</option>
+                    <option>Purchasing</option>
+                    <option>CrmAgent</option>
+                    <option>Supplier</option>
+                    <option>Admin</option>
+                </select>
+            </div>
+            <div class="mb">
+                <label>Davet Kodu</label>
+                <input name="inviteCode" />
+            </div>
+        </details>
+
+        <label class="mb"><input type="checkbox" name="rememberMe" value="true" checked /> Oturum açık kalsın</label>
+        <button class="btn primary" type="submit">Kaydol</button>
+        @Html.ValidationSummary()
+    </form>
+</section>

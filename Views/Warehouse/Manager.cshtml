@@ -1,0 +1,161 @@
+﻿@using MLYSO.Web.Models
+@{
+    Layout = "_Layout";
+    var canCreate = User.IsInRole(Roles.WarehouseManager) || User.IsInRole(Roles.Admin);
+}
+
+<section class="card">
+    <h2>Depo Yönetimi</h2>
+    <div id="ping" class="muted">Sayfa yükleniyor…</div>
+
+    <h3 style="margin-top:12px">Raf Yönetimi (demo)</h3>
+    <div class="grid" style="grid-template-columns: repeat(4,minmax(0,1fr)); gap:8px; max-width:720px">
+        <input id="rack_prefix" placeholder="Raf (örn: A)" />
+        <input id="rack_aisle" type="number" value="1" />
+        <input id="rack_level" type="number" value="0" />
+        <button id="btnSaveRack">Kaydet</button>
+    </div>
+</section>
+
+<section class="card" style="margin-top:14px">
+    <div class="flex" style="justify-content:space-between;align-items:center">
+        <h3>Görevler</h3>
+        <div class="muted" id="listMsg"></div>
+    </div>
+
+    @if (canCreate)
+    {
+        <div class="grid" style="grid-template-columns: repeat(5,minmax(0,1fr)); gap:8px; margin-bottom:8px">
+            <input id="t_type" placeholder="Tür (Pick/Putaway/Count…)" />
+            <input id="t_loc" placeholder="Lokasyon (örn: A-01-01)" />
+            <input id="t_sku" placeholder="SKU" />
+            <input id="t_qty" type="number" min="1" value="1" />
+            <button id="btnAdd">Yeni Görev</button>
+        </div>
+    }
+
+    <table style="width:100%">
+        <thead><tr><th>ID</th><th>Tür</th><th>Lokasyon</th><th>SKU</th><th>Adet</th><th>Durum</th><th>Hızlı</th></tr></thead>
+        <tbody id="tblTasks"><tr><td colspan="7" class="muted">Yükleniyor…</td></tr></tbody>
+    </table>
+</section>
+
+@section Scripts {
+    <script>
+        const $ = s => document.querySelector(s);
+        const statusList = ['Open','InProgress','Done'];
+
+        // ------- UI-STATE (raf) -------
+        async function loadUiState(){
+          const ping = $('#ping');
+          try{
+            const r = await fetch('/api/warehouse/ui-state', { credentials:'include' });
+            if (r.ok) {
+              const s = await r.json();
+              $('#rack_prefix').value = s.rackPrefix ?? 'A';
+              $('#rack_aisle').value  = s.rackAisle  ?? 1;
+              $('#rack_level').value  = s.rackLevel  ?? 0;
+              ping.innerHTML = 'Sayfa yüklendi <span style="color:#22c55e">✔</span>';
+            } else {
+              ping.textContent = 'UI-state okunamadı ('+r.status+')';
+            }
+          }catch(e){ ping.textContent = 'Hata: ' + e.message; }
+        }
+        async function saveRack(){
+          const patch = {
+            rackPrefix: $('#rack_prefix').value,
+            rackAisle:  Number($('#rack_aisle').value),
+            rackLevel:  Number($('#rack_level').value)
+          };
+          const r = await fetch('/api/warehouse/ui-state', {
+            method:'PUT', credentials:'include',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(patch)
+          });
+          if(!r.ok) { alert('Kaydedilemedi: '+r.status); return; }
+          alert('Kaydedildi');
+        }
+
+        // ------- GÖREV LİSTESİ -------
+        function rowHtml(x){
+          const opts = statusList.map(s => `<option ${s===x.status?'selected':''}>${s}</option>`).join('');
+          return `<tr id="row${x.id}">
+            <td>${x.id}</td>
+            <td>${x.type||'-'}</td>
+            <td>${x.location||'-'}</td>
+            <td>${x.sku||'-'}</td>
+            <td>${x.quantity||0}</td>
+            <td>
+              <select onchange="updTask(${x.id}, this.value)">${opts}</select>
+            </td>
+            <td>
+              <select onchange="quick(${x.id}, this.value)">
+                <option value="">Seç</option>
+                <option value="Done">Yaptım</option>
+                <option value="Open">Yapmadım</option>
+              </select>
+            </td>
+          </tr>`;
+        }
+
+        async function loadTasks(){
+          $('#listMsg').textContent = 'Yükleniyor…';
+          try{
+            const r = await fetch('/api/warehouse/tasks', { credentials:'include' });
+            if(!r.ok){ $('#tblTasks').innerHTML = `<tr><td colspan="7" class="muted">Hata: ${r.status}</td></tr>`; return; }
+            const js = await r.json();
+            const list = js.items || [];
+            $('#tblTasks').innerHTML = list.length ? list.map(rowHtml).join('') : `<tr><td colspan="7" class="muted">Kayıt yok</td></tr>`;
+            $('#listMsg').textContent = `Toplam: ${list.length}`;
+          }catch(e){
+            $('#tblTasks').innerHTML = `<tr><td colspan="7" class="muted">Hata: ${e.message}</td></tr>`;
+            $('#listMsg').textContent = 'Hata';
+          }
+        }
+
+        async function updTask(id, status){
+          const r = await fetch(`/api/warehouse/tasks/${id}`, {
+            method:'PUT', credentials:'include',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ status })
+          });
+          if(!r.ok) alert('Güncellenemedi: '+r.status);
+        }
+
+        async function quick(id, val){
+          if(!val) return;
+          await updTask(id, val);
+          await loadTasks();
+        }
+
+        // ------- YENİ GÖREV (yalnız manager/admin görür) -------
+        async function addTask(){
+          const body = {
+            type: $('#t_type').value.trim() || 'Pick',
+            location: $('#t_loc').value.trim() || '-',
+            sku: $('#t_sku').value.trim() || '-',
+            quantity: Number($('#t_qty').value||0) || 1
+          };
+          const r = await fetch('/api/warehouse/tasks', {
+            method:'POST', credentials:'include',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(body)
+          });
+          if(!r.ok){ alert('Eklenemedi: '+r.status); return; }
+          const item = await r.json();
+          // başa ekle
+          const tb = $('#tblTasks');
+          if (tb.querySelector('.muted')) tb.innerHTML = '';
+          tb.insertAdjacentHTML('afterbegin', rowHtml(item));
+          $('#listMsg').textContent = 'Eklendi';
+        }
+
+        document.addEventListener('DOMContentLoaded', ()=>{
+          $('#btnSaveRack').addEventListener('click', saveRack);
+          const btnAdd = document.getElementById('btnAdd');
+          if (btnAdd) btnAdd.addEventListener('click', addTask);
+          loadUiState();
+          loadTasks();
+        });
+    </script>
+}

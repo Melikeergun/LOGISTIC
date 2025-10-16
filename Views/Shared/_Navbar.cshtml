@@ -1,0 +1,71 @@
+﻿@using System.Security.Claims
+@{
+    var isAuth = User?.Identity?.IsAuthenticated ?? false;
+    var roleName = isAuth ? (User?.Claims?.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value ?? "") : "";
+
+    bool isAdmin = User?.IsInRole(Roles.Admin) ?? false;
+    bool isOps = isAdmin || (User?.IsInRole(Roles.Operations) ?? false) || (User?.IsInRole(Roles.Planning) ?? false) || (User?.IsInRole(Roles.Logistics) ?? false);
+    bool isWhMgr = isAdmin || (User?.IsInRole(Roles.WarehouseChief) ?? false) || (User?.IsInRole(Roles.WarehouseManager) ?? false);
+    bool isWhOp = isAdmin || (User?.IsInRole(Roles.WarehouseOperator) ?? false);
+    bool isDriver = isAdmin || (User?.IsInRole(Roles.Driver) ?? false);
+    bool isErp = isAdmin || (User?.IsInRole(Roles.Purchasing) ?? false);
+    bool isCrm = isAdmin || (User?.IsInRole(Roles.CrmAgent) ?? false) || (User?.IsInRole(Roles.CustomerService) ?? false);
+    bool isSupplier = isAdmin || (User?.IsInRole(Roles.Supplier) ?? false);
+    bool isCustomer = isAdmin || (User?.IsInRole(Roles.Customer) ?? false);
+}
+
+<nav class="topbar">
+    <a class="lp-brand" href="/">MLYSO</a>
+    <ul class="menu">
+        @if (isAdmin)
+        {
+            <li><a href="/ui/dashboard">Dashboard</a></li>
+        }
+        @if (isOps)
+        {
+            <li><a href="/ui/plan">Planlama</a></li>
+        }
+        @if (isWhMgr)
+        {
+            <li><a href="/ui/warehouse">Depo Yönetimi</a></li>
+        }
+        @if (isWhOp)
+        {
+            <li><a href="/ui/tasks">Operatör Görevleri</a></li>
+        }
+        @if (isDriver)
+        {
+            <li><a href="/ui/driver">Dağıtım/PoD</a></li>
+        }
+        @if (isErp)
+        {
+            <li><a href="/ui/erp-purchase">Satınalma/ERP</a></li>
+        }
+        @if (isCrm)
+        {
+            <li><a href="/ui/crm-risk">CRM</a></li>
+        }
+        @if (isSupplier)
+        {
+            <li><a href="/ui/supplier-asn">Tedarikçi ASN</a></li>
+        }
+        @if (isCustomer)
+        {
+            <li><a href="/customer/orders">Siparişlerim</a></li>
+        }
+    </ul>
+
+    <div class="userbox">
+        @if (isAuth)
+        {
+            <span id="meBox">@User.Identity!.Name (@roleName)</span>
+            <a class="btn ghost" href="/roles/choose">Rol Değiştir</a>
+            <form method="post" action="/account/logout" style="display:inline">@Html.AntiForgeryToken()<button class="btn">Çıkış</button></form>
+        }
+        else
+        {
+            <a class="btn" href="/account/login">Giriş</a>
+            <a class="btn ghost" href="/account/register">Kayıt</a>
+        }
+    </div>
+</nav>

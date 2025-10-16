@@ -1,0 +1,38 @@
+﻿@model MLYSO.Web.Models.CustomerOrdersState
+@using MLYSO.Web.Models
+@{
+    Layout = "_Layout";
+    var canApprove = User.IsInRole(Roles.CRM) || User.IsInRole(Roles.CustomerService) || User.IsInRole(Roles.Admin);
+}
+<section class="card">
+    <h2>İade Süreci</h2>
+    @if (TempData["ok"] != null)
+    {
+        <div class="alert">@TempData["ok"]</div>
+    }
+
+    <table class="table">
+        <thead>
+            <tr><th>No</th><th>Durum</th><th>Neden</th><th>İşlem</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var o in Model.Orders.Where(x => x.Status == "ReturnRequested" || x.Status == "Returned"))
+            {
+                <tr>
+                    <td>@o.OrderNo</td>
+                    <td>@o.Status</td>
+                    <td>@o.ReturnReason</td>
+                    <td>
+                        @if (canApprove && o.Status == "ReturnRequested")
+                        {
+                            <form method="post" action="/customer/orders/@o.Id/approve-return">
+                                @Html.AntiForgeryToken()
+                                <button class="btn">Onayla</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>

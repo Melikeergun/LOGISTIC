@@ -1,0 +1,14 @@
+﻿@{
+    Layout = "_Layout"; var oid = (int)ViewBag.Id;
+}
+@await Html.PartialAsync("_TokenBar")
+<script src="/js/ui.js"></script>
+<script>document.addEventListener('DOMContentLoaded', UI.requireAuth);</script>
+
+<section class="card">
+    <h2 id="ordHeader">Sipariş</h2>
+    <div id="editWrap"></div>
+    <button class="btn" id="btnSave">Kaydet</button>
+</section>
+<script src="/js/ui.js"></script>
+<script>document.addEventListener('DOMContentLoaded', ()=>UI.pageEdit(@oid));</script>

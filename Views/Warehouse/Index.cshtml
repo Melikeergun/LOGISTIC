@@ -1,0 +1,38 @@
+﻿@{
+    Layout = "_Layout";
+}
+<section class="card">
+    <h2>Depo Yönetimi – Görevler</h2>
+    <form id="f" onsubmit="return add();">
+        <div class="grid" style="grid-template-columns: repeat(5,minmax(0,1fr)); gap:8px">
+            <input name="Type" placeholder="Type (Pick/Putaway/Count)" required />
+            <input name="Location" placeholder="Location" required />
+            <input name="Sku" placeholder="SKU" required />
+            <input name="Quantity" type="number" min="1" value="1" required />
+            <button class="btn" type="submit">Görev Ekle</button>
+        </div>
+    </form>
+    <table id="tbl" style="margin-top:12px;width:100%">
+        <thead><tr><th>ID</th><th>Type</th><th>Status</th><th>Loc</th><th>SKU</th><th>Qty</th><th></th></tr></thead>
+        <tbody></tbody>
+    </table>
+</section>
+<script>
+    async function load(){
+      const r=await fetch('/api/warehouse/tasks',{credentials:'include'}); const js=await r.json();
+      tbl.querySelector('tbody').innerHTML = js.items.map(x=>`<tr>
+        <td>${x.id}</td><td>${x.type}</td><td>${x.status}</td><td>${x.location}</td><td>${x.sku}</td><td>${x.quantity}</td>
+        <td><button onclick="done(${x.id})">Tamam</button></td></tr>`).join('');
+    }
+    async function done(id){
+      await fetch('/api/warehouse/tasks/'+id,{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body: JSON.stringify({status:'Done'})});
+      load();
+    }
+    async function add(){
+      const fd = new FormData(f);
+      const dto = Object.fromEntries(fd.entries()); dto.Quantity = parseInt(dto.Quantity||'1',10);
+      await fetch('/api/warehouse/tasks',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body: JSON.stringify(dto)});
+      f.reset(); load(); return false;
+    }
+    document.addEventListener('DOMContentLoaded', load);
+</script>

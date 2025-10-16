@@ -1,0 +1,66 @@
+﻿@{
+    Layout = "_Layout";
+}
+@await Html.PartialAsync("_TokenBar")
+
+<section class="card">
+    <h2>Dashboard</h2>
+    <p class="muted">Son ETL zamanı ve temel KPI'lar</p>
+    <div id="kpiBox">Yükleniyor...</div>
+</section>
+
+<section class="card" style="margin-top:12px">
+    <h3>Son 7 Gün Sipariş Trendi</h3>
+    <table id="trendTbl" style="width:100%">
+        <thead><tr><th>Tarih</th><th>Adet</th></tr></thead>
+        <tbody></tbody>
+    </table>
+    <div style="margin-top:8px">
+        <button class="btn" id="btnExport">KPI CSV İndir</button>
+    </div>
+</section>
+
+<script>
+    async function loadKpis(){
+      const t = localStorage.getItem('jwt')||'';
+      const res = await fetch('/api/reports/kpi',{headers:{Authorization:'Bearer '+t}});
+      if(!res.ok){ document.getElementById('kpiBox').textContent = 'Önce token girin.'; return; }
+      const js = await res.json();
+      const k = js.kpi || {};
+      document.getElementById('kpiBox').innerHTML = `
+        <div class="grid">
+          <div class="card"><h3>Son ETL</h3><p>${js.lastEtlUtc||'-'}</p></div>
+          <div class="card"><h3>30 Günde Sipariş</h3><p>${k.orders_30d}</p></div>
+          <div class="card"><h3>Ort. Teslim (gün)</h3><p>${k.avg_delivery_days}</p></div>
+          <div class="card"><h3>İade Oranı (dinamik)</h3><p>% ${k.dyn_return_rate}</p></div>
+          <div class="card"><h3>SLA On-Time</h3><p>% ${k.sla_on_time_rate}</p></div>
+          <div class="card"><h3>Açık Şikayet</h3><p>${k.open_complaints}</p></div>
+        </div>`;
+    }
+
+    async function loadTrend(){
+      const t = localStorage.getItem('jwt')||'';
+      const r = await fetch('/api/reports/trend7',{headers:{Authorization:'Bearer '+t}});
+      if(!r.ok){ return; }
+      const js = await r.json();
+      document.querySelector('#trendTbl tbody').innerHTML =
+        js.map(x=>`<tr><td>${x.date}</td><td>${x.orders}</td></tr>`).join('');
+    }
+
+    async function exportCsv(){
+      const t = localStorage.getItem('jwt')||'';
+      const r = await fetch('/api/reports/kpi/export',{headers:{Authorization:'Bearer '+t}});
+      if(!r.ok){ alert('İndirme için yetkiniz yok (Admin/Operations).'); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'kpi.csv';
+      document.body.appendChild(a); a.click();
+      URL.revokeObjectURL(url); a.remove();
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      loadKpis(); loadTrend();
+      document.getElementById('btnExport').addEventListener('click', exportCsv);
+    });
+</script>

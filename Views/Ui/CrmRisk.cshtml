@@ -1,0 +1,18 @@
+﻿@{
+    Layout = "_Layout";
+}
+@await Html.PartialAsync("_TokenBar")
+<section class="card">
+    <h2>CRM – Riskli Müşteriler</h2>
+    <p>Kurallı baz çizgi skorlama (şikayet, son sipariş, anket).</p>
+    <table id="tbl" style="width:100%"><thead><tr><th>Id</th><th>Ad</th><th>Risk</th></tr></thead><tbody></tbody></table>
+</section>
+<script>
+    async function loadRisk(){
+      const t = localStorage.getItem('jwt')||'';
+      const r = await fetch('/api/crm/risk',{headers:{Authorization:'Bearer '+t}});
+      const js = await r.json();
+      document.querySelector('#tbl tbody').innerHTML = js.map(x=>`<tr><td>${x.customerId}</td><td>${x.name}</td><td>${x.score}</td></tr>`).join('');
+    }
+    document.addEventListener('DOMContentLoaded', loadRisk);
+</script>

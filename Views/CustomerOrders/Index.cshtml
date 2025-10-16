@@ -1,0 +1,41 @@
+﻿@model MLYSO.Web.Models.CustomerOrdersState
+@{
+    Layout = "_Layout";
+}
+<section class="card">
+    <h2>Siparişlerim</h2>
+    @if (TempData["ok"] != null)
+    {
+        <div class="alert">@TempData["ok"]</div>
+    }
+
+    <table class="table">
+        <thead>
+            <tr><th>No</th><th>Müşteri</th><th>Durum</th><th>İşlem</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var o in Model.Orders)
+            {
+                <tr>
+                    <td>@o.OrderNo</td>
+                    <td>@o.Customer</td>
+                    <td>@o.Status</td>
+                    <td>
+                        @if (o.Status == "Shipped")
+                        {
+                            <form method="post" action="/customer/orders/@o.Id/confirm-delivery" style="display:inline">
+                                @Html.AntiForgeryToken()
+                                <button class="btn">Teslimi Onayla</button>
+                            </form>
+                        }
+                        <form method="post" action="/customer/orders/@o.Id/request-return" style="display:inline">
+                            @Html.AntiForgeryToken()
+                            <input name="reason" placeholder="İade nedeni" />
+                            <button class="btn-ghost">İade Talebi</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>

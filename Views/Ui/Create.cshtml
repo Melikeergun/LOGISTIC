@@ -1,0 +1,34 @@
+﻿@{
+    Layout = "_Layout";
+}
+<section class="card" style="max-width:720px;margin:auto">
+    <h2>Yeni Dinamik Sipariş</h2>
+    <div class="row"><label>Müşteri Id (opsiyonel)</label><input id="cid" /></div>
+    <div class="row">
+        <label>Durum</label>
+        <select id="status">
+            <option>created</option>
+            <option>approved</option>
+            <option>shipped</option>
+            <option>delivered</option>
+            <option>return</option>
+            <option>exchange</option>
+        </select>
+    </div>
+    <div class="row">
+        <label>Ek Alanlar (JSON)</label>
+        <textarea id="fields" rows="4" placeholder='{"return_request":"yes"}'></textarea>
+    </div>
+    <button class="btn" onclick="save()">Kaydet</button>
+</section>
+<script>
+    async function save(){
+      let fields = {};
+      const raw = document.getElementById('fields').value.trim();
+      if(raw){ try{ fields = JSON.parse(raw); }catch{ return alert('JSON hatalı'); } }
+      const body = { customerId: document.getElementById('cid').value.trim(), status: document.getElementById('status').value, fields };
+      const r = await fetch('/api/orders/dynamic',{ method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) });
+      if(!r.ok){ const e = await r.text(); alert('Hata: '+e); return; }
+      const js = await r.json(); alert('Oluşturuldu: USR-'+js.id); location.href='/ui/orders';
+    }
+</script>

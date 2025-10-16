@@ -1,0 +1,33 @@
+﻿@{
+    Layout = "_Layout";
+}
+@await Html.PartialAsync("_TokenBar")
+<section class="card">
+    <h2>Teklif Kıyaslama</h2>
+    <div>
+        <label>ProductId:</label>
+        <input id="pid" placeholder="ürün id" />
+        <button class="btn" id="btn">Getir</button>
+    </div>
+    <table style="width:100%;margin-top:8px" id="tbl">
+        <thead>
+            <tr>
+                <th>Tedarikçi</th>
+                <th>Fiyat</th>
+                <th>Termin (gün)</th>
+                <th>Kalite</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</section>
+<script>
+    document.getElementById('btn').onclick = async ()=>{
+      const pid = document.getElementById('pid').value.trim();
+      if(!pid) return;
+      const t = localStorage.getItem('jwt')||'';
+      const r = await fetch('/api/erp/quotes/compare?productId='+encodeURIComponent(pid),{headers:{Authorization:'Bearer '+t}});
+      const js = await r.json();
+      document.querySelector('#tbl tbody').innerHTML = js.map(x=>`<tr><td>${x.name}</td><td>${x.price}</td><td>${x.leadTimeDays}</td><td>${x.qualityScore}</td></tr>`).join('');
+    };
+</script>

@@ -1,0 +1,322 @@
+﻿@using MLYSO.Web.Models
+@{
+    Layout = "_Layout";
+    var canCreate = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Purchasing);
+}
+
+<section class="card">
+    <div class="flex" style="justify-content:space-between;align-items:center">
+        <h2>ERP • Satınalma</h2>
+        <div class="grid" style="grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;min-width:720px">
+            <input id="f_sup" placeholder="Tedarikçi" />
+            <select id="f_status">
+                <option value="">Durum (hepsi)</option>
+                <option value="Draft">Draft</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Received">Received</option>
+            </select>
+            <input id="f_from" type="date" />
+            <input id="f_to" type="date" />
+            <button id="btnLoad">Yükle</button>
+            <button id="btnCsv" class="ghost">CSV</button>
+        </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px">
+        <div class="subcard"><div class="muted">Toplam PO</div><div id="k_total" class="kpi-lg">—</div></div>
+        <div class="subcard"><div class="muted">Açık Bakiye</div><div id="k_open" class="kpi-lg">—</div></div>
+        <div class="subcard"><div class="muted">Bekleyen Onay</div><div id="k_pending" class="kpi-lg">—</div></div>
+    </div>
+</section>
+
+<section class="card">
+    <div class="flex" style="justify-content:space-between;align-items:center">
+        <h3>Satınalma Siparişleri</h3>
+        @if (canCreate)
+        {
+            <button id="btnNew">Yeni PO</button>
+        }
+    </div>
+    <table class="w100" style="margin-top:8px">
+        <thead>
+            <tr>
+                <th>#PO</th>
+                <th>Tarih</th>
+                <th>Tedarikçi</th>
+                <th>Satır</th>
+                <th>Tutar</th>
+                <th>Durum</th>
+                <th>İşlem</th>
+            </tr>
+        </thead>
+        <tbody id="tbl"></tbody>
+    </table>
+</section>
+
+<section class="card">
+    <h3>Tedarikçi Bazlı Harcama (son liste)</h3>
+    <table class="w100">
+        <thead><tr><th>Tedarikçi</th><th>Sipariş</th><th>Tutar</th></tr></thead>
+        <tbody id="supTbl"><tr><td colspan="3" class="muted">Yükleniyor…</td></tr></tbody>
+    </table>
+</section>
+
+<!-- Yeni PO diyaloğu -->
+<dialog id="dlgNew" style="max-width:900px">
+    <form method="dialog" style="min-width:760px">
+        <h3>Yeni Satınalma Siparişi</h3>
+        <div class="grid" style="grid-template-columns:2fr 1fr; gap:8px">
+            <input id="n_sup" placeholder="Tedarikçi (örn: Beta Kimya)" required />
+            <input id="n_date" type="date" />
+        </div>
+        <div class="subcard" style="margin-top:8px">
+            <div class="flex" style="justify-content:space-between;align-items:center">
+                <b>Satırlar</b>
+                <button type="button" class="ghost" onclick="addLine()">Satır Ekle</button>
+            </div>
+            <table class="w100" style="margin-top:6px">
+                <thead><tr><th>SKU</th><th>Açıklama</th><th>Adet</th><th>Birim</th><th>Tutar</th><th></th></tr></thead>
+                <tbody id="n_lines"></tbody>
+            </table>
+            <div style="text-align:right;margin-top:6px"><b>Toplam:</b> <span id="n_total">0</span></div>
+        </div>
+        <div class="flex" style="justify-content:flex-end; gap:8px; margin-top:8px">
+            <button value="cancel" class="ghost">İptal</button>
+            <button id="n_save" value="default">Kaydet</button>
+        </div>
+    </form>
+</dialog>
+
+<style>
+    .subcard {
+        background: var(--card);
+        border: 1px solid var(--border);
+        padding: 10px;
+        border-radius: 12px
+    }
+
+    .w100 {
+        width: 100%
+    }
+
+    .kpi-lg {
+        font-size: 24px;
+        font-weight: 700
+    }
+
+    dialog::backdrop {
+        background: rgba(0,0,0,.35)
+    }
+</style>
+
+@section Scripts {
+    <script>
+        (() => {
+          const $ = s => document.querySelector(s);
+
+          // ---- FAKE fallback veri (API yoksa kullanılacak) ----
+          const FAKE = {
+            orders: [
+              { id: 1001, poNo:'PO-2025-001', date:'2025-09-01', supplier:'Beta Kimya', lines:3, amount: 18250, status:'Pending' },
+              { id: 1002, poNo:'PO-2025-002', date:'2025-09-02', supplier:'Eksen Tekstil', lines:2, amount:  7650, status:'Approved' },
+              { id: 1003, poNo:'PO-2025-003', date:'2025-09-03', supplier:'Hepsi Med', lines:4, amount: 21500, status:'Draft'   },
+            ]
+          };
+
+          // ---- State ----
+          let ORDERS = [];
+
+          // ---- Load KPI + List ----
+          async function load(){
+            const qs = new URLSearchParams();
+            const sup = $('#f_sup').value.trim();
+            const st  = $('#f_status').value;
+            const f   = $('#f_from').value, t = $('#f_to').value;
+            if (sup) qs.set('supplier', sup);
+            if (st)  qs.set('status', st);
+            if (f)   qs.set('from', f);
+            if (t)   qs.set('to', t);
+
+            // Önce API’yı dene
+            try {
+              const r = await fetch('/api/erp/purchase/orders' + (qs.toString() ? ('?'+qs.toString()) : ''), { credentials:'include' });
+              if (!r.ok) throw 0;
+              const js = await r.json();
+              ORDERS = (js.items || js || []).map(mapi);
+            } catch {
+              // API yoksa fake
+              ORDERS = FAKE.orders.map(mapi);
+            }
+            render();
+          }
+
+          function mapi(o){
+            // Esnek map: API alan adları farklıysa uyarlıyor
+            return {
+              id:      o.id ?? o.Id ?? Math.floor(Math.random()*1e6),
+              poNo:    o.poNo ?? o.PoNo ?? o.po ?? ('PO-'+(o.id ?? o.Id ?? 'N/A')),
+              date:    (o.date ?? o.Date ?? '').toString().substring(0,10),
+              supplier:o.supplier ?? o.Supplier ?? o.vendor ?? '-',
+              lines:   o.lines ?? o.Lines ?? o.itemCount ?? 0,
+              amount:  o.amount ?? o.Amount ?? o.total ?? 0,
+              status:  o.status ?? o.Status ?? 'Draft'
+            };
+          }
+
+          function render(){
+            // Tablo
+            $('#tbl').innerHTML = ORDERS.length ? ORDERS.map(rowHtml).join('')
+              : `<tr><td colspan="7" class="muted">Kayıt yok</td></tr>`;
+
+            // KPI
+            const total = ORDERS.length;
+            const open  = ORDERS.filter(x => ['Draft','Pending','Approved'].includes(x.status)).reduce((s,x)=>s+(+x.amount||0),0);
+            const pend  = ORDERS.filter(x => x.status==='Pending').length;
+            $('#k_total').textContent   = total;
+            $('#k_open').textContent    = tl(open);
+            $('#k_pending').textContent = pend;
+
+            // Supplier summary
+            const grp = {};
+            ORDERS.forEach(x => { grp[x.supplier] = grp[x.supplier] || { c:0, t:0 }; grp[x.supplier].c++; grp[x.supplier].t += (+x.amount||0); });
+            const ent = Object.entries(grp).sort((a,b)=>b[1].t-a[1].t);
+            $('#supTbl').innerHTML = ent.length ? ent.map(([k,v])=>`<tr><td>${k}</td><td>${v.c}</td><td>${tl(v.t)}</td></tr>`).join('')
+              : `<tr><td colspan="3" class="muted">Veri bulunamadı</td></tr>`;
+          }
+
+          function rowHtml(x){
+            const opts = ['Draft','Pending','Approved','Rejected','Received']
+              .map(s=>`<option ${s===x.status?'selected':''}>${s}</option>`).join('');
+            return `<tr id="r${x.id}">
+              <td>${x.poNo}</td>
+              <td>${x.date||'-'}</td>
+              <td>${x.supplier}</td>
+              <td>${x.lines||0}</td>
+              <td>${tl(x.amount)}</td>
+              <td><select onchange="upd(${x.id}, this.value)">${opts}</select></td>
+              <td>
+                <button class="ghost" onclick="act(${x.id},'Approved')">Onayla</button>
+                <button class="ghost" onclick="act(${x.id},'Rejected')">Reddet</button>
+                <button class="ghost" onclick="act(${x.id},'Received')">Teslim Al</button>
+              </td>
+            </tr>`;
+          }
+
+          function tl(v){ try{ return new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY'}).format(v||0); }catch{ return (v||0).toFixed(2); } }
+
+          // ---- Update helpers ----
+          window.upd = async (id, status) => { await apiUpdate(id,status); localUpdate(id,status); render(); };
+          window.act = async (id, status) => { await apiUpdate(id,status); localUpdate(id,status); render(); };
+
+          function localUpdate(id,status){
+            const i = ORDERS.findIndex(x=>x.id===id);
+            if(i>=0) ORDERS[i].status = status;
+          }
+
+          async function apiUpdate(id,status){
+            try{
+              const r = await fetch(`/api/erp/purchase/orders/${id}`, {
+                method:'PUT', credentials:'include',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ status })
+              });
+              if(!r.ok) throw 0;
+            }catch{ /* API yoksa sessizce UI’da güncelledik */ }
+          }
+
+          // ---- New PO dialog ----
+          const dlg = $('#dlgNew');
+          $('#btnNew')?.addEventListener('click', () => { resetNew(); dlg.showModal(); });
+
+          function resetNew(){
+            $('#n_sup').value = '';
+            $('#n_date').valueAsDate = new Date();
+            $('#n_lines').innerHTML = '';
+            addLine();
+            recalc();
+          }
+
+          window.addLine = () => {
+            const id = Math.random().toString(36).slice(2);
+            $('#n_lines').insertAdjacentHTML('beforeend', `
+              <tr id="l${id}">
+                <td><input class="w100" placeholder="SKU"/></td>
+                <td><input class="w100" placeholder="Açıklama"/></td>
+                <td><input class="w100" type="number" min="1" value="1" onchange="recalc()"/></td>
+                <td><input class="w100" type="number" min="0" value="0" step="0.01" onchange="recalc()"/></td>
+                <td class="lineTotal">0</td>
+                <td><button type="button" class="ghost" onclick="delLine('${id}')">Sil</button></td>
+              </tr>`);
+          };
+          window.delLine = (id)=>{ const tr = document.getElementById('l'+id); tr && tr.remove(); recalc(); };
+
+          window.recalc = () => {
+            let sum = 0;
+            [...document.querySelectorAll('#n_lines tr')].forEach(tr=>{
+              const [sku, desc, qty, price] = tr.querySelectorAll('input');
+              const q = Number(qty.value||0), p = Number(price.value||0), t = q*p;
+              tr.querySelector('.lineTotal').textContent = tl(t);
+              sum += t;
+            });
+            $('#n_total').textContent = tl(sum);
+          };
+
+          $('#n_save')?.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const body = {
+              supplier: $('#n_sup').value.trim(),
+              date: $('#n_date').value,
+              lines: [...document.querySelectorAll('#n_lines tr')].map(tr=>{
+                const [sku, desc, qty, price] = tr.querySelectorAll('input');
+                return { sku: sku.value.trim(), description: desc.value.trim(), qty: Number(qty.value||0), price: Number(price.value||0) };
+              })
+            };
+            const lines = body.lines.length;
+            const amount = body.lines.reduce((s,x)=> s + (x.qty*x.price), 0);
+            let created = null;
+            try{
+              const r = await fetch('/api/erp/purchase/orders', {
+                method:'POST', credentials:'include',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify(body)
+              });
+              if(!r.ok) throw 0;
+              created = await r.json(); // { id, ... }
+            }catch{ /* API yoksa UI’da ekleyeceğiz */ }
+            // UI’ya ekle
+            ORDERS.unshift({
+              id: created?.id ?? (Math.max(0,...ORDERS.map(x=>+x.id||0))+1),
+              poNo: created?.poNo ?? ('PO-'+new Date().toISOString().slice(0,10)+'-'+Math.floor(Math.random()*1000)),
+              date: body.date || new Date().toISOString().slice(0,10),
+              supplier: body.supplier || '-',
+              lines, amount, status: 'Pending'
+            });
+            dlg.close();
+            render();
+          });
+
+          // ---- CSV Export ----
+          $('#btnCsv').addEventListener('click', ()=>{
+            const rows = [['PO','Tarih','Tedarikçi','Satır','Tutar','Durum']]
+              .concat(ORDERS.map(x=>[x.poNo,x.date,x.supplier,x.lines,x.amount,x.status]));
+            const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href=url; a.download='purchase_orders.csv'; a.click();
+            URL.revokeObjectURL(url);
+          });
+
+          // ---- Bind + Load ----
+          $('#btnLoad').addEventListener('click', load);
+          document.addEventListener('DOMContentLoaded', () => {
+            // tarih aralığını son 7 güne ayarla
+            const to = new Date(); const from = new Date(); from.setDate(to.getDate()-7);
+            $('#f_from').valueAsDate = from; $('#f_to').valueAsDate = to;
+            load();
+          });
+        })();
+    </script>
+
+}

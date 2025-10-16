@@ -1,0 +1,45 @@
+﻿@{
+    Layout = "_PublicLayout";
+    var returnUrl = (ViewBag.ReturnUrl as string) ?? "/ui";
+}
+
+<section class="auth-hero">
+    <video class="auth-video" autoplay muted loop playsinline>
+        <source src="/media/account.mp4" type="video/mp4" />
+    </video>
+    <div class="auth-overlay"></div>
+
+    <div class="auth-card">
+        <h2>Rolünüzü Seçin</h2>
+        <p class="muted">Bu seçim, menü ve yetkilerinizi belirler.</p>
+
+        <form method="post" action="/roles/choose?returnUrl=@returnUrl">
+            @Html.AntiForgeryToken()
+            <div class="role-grid">
+                @foreach (var r in new[]{
+                                "Admin","Operations","Planning","Logistics",
+                                "WarehouseManager","WarehouseChief","WarehouseOperator",
+                                "Driver","Purchasing","CrmAgent","CustomerService",
+                                "Supplier","Customer"})
+                {
+                    <button class="btn" type="submit" name="role" value="@r">@r</button>
+                }
+            </div>
+        </form>
+    </div>
+</section>
+
+<style>
+    .role-grid {
+        display: grid;
+        grid-template-columns: repeat(3,minmax(0,1fr));
+        gap: 10px;
+        margin-top: 14px
+    }
+
+    @@media (max-width:720px) {
+        .role-grid {
+            grid-template-columns: 1fr 1fr
+        }
+    }
+</style>

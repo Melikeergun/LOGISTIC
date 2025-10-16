@@ -1,0 +1,35 @@
+﻿@{
+    Layout = null;
+    var title = ViewBag.Title as string ?? "MLYSO Logistics";
+}
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>@title</title>
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/site.css" />
+
+    @RenderSection("Styles", required: false)
+</head>
+<body class="landing">
+    <header class="lp-topbar">
+        <a class="lp-brand" href="/">MLYSO Logistics</a>
+        <nav class="lp-nav">
+            <a href="/account/login" class="btn ghost">Giriş</a>
+            <a href="/account/register" class="btn primary">Kayıt Ol</a>
+        </nav>
+    </header>
+
+    @RenderBody()
+
+    <footer class="lp-footer">
+        © @DateTime.Now.Year MLYSO • Tüm hakları saklıdır.
+    </footer>
+
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

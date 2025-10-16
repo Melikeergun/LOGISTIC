@@ -1,0 +1,259 @@
+﻿@using MLYSO.Web.Models
+@{
+    Layout = "_Layout";
+    var isAdmin = User.IsInRole(Roles.Admin);
+}
+<section class="page-hero">
+    <h1>🚚 Dağıtım Rotam</h1>
+    <p>Durak durumları, PoD ve gecikme bildirimleri.</p>
+</section>
+
+<section class="app-container">
+    <div class="card">
+        <div class="flex" style="align-items:center; justify-content:space-between">
+            <h2>Rota</h2>
+            <div id="summary" class="muted"></div>
+        </div>
+
+        @if (isAdmin)
+        {
+            <details style="margin:10px 0">
+                <summary><b>Admin:</b> Rota / Durak Oluştur</summary>
+                <div class="grid" style="grid-template-columns: repeat(5, minmax(0,1fr)); gap:8px; margin-top:6px">
+                    <select id="drv"></select>
+                    <input id="veh" placeholder="Araç (örn: TR-34 ABC 123)" />
+                    <button onclick="mkRoute()">Rota Oluştur</button>
+                    <input id="rid" placeholder="RouteId" />
+                    <button onclick="mkStop()">Durak Ekle</button>
+                </div>
+                <div class="grid" style="grid-template-columns: repeat(5, minmax(0,1fr)); gap:8px; margin-top:6px">
+                    <input id="st_no" type="number" placeholder="#" />
+                    <input id="st_cust" placeholder="Müşteri" />
+                    <input id="st_addr" placeholder="Adres" />
+                    <input id="st_ord" placeholder="Sipariş" />
+                    <input id="st_time" type="datetime-local" />
+                </div>
+            </details>
+        }
+
+        <div class="flex" style="gap:8px; flex-wrap:wrap; margin:6px 0 2px">
+            <button id="btnDelay" class="btn warn">Gecikme Bildir</button>
+            <div style="flex:1"></div>
+        </div>
+
+        <div id="route" class="muted" style="margin:6px 0"></div>
+
+        <div style="overflow:auto">
+            <table id="tbl" class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Müşteri</th>
+                        <th>Adres</th>
+                        <th>Sipariş</th>
+                        <th>Plan</th>
+                        <th>Durum</th>
+                        <th>Hızlı</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        (()=> {
+          const $ = (s) => document.querySelector(s);
+          const $tbody = () => $('#tbl').querySelector('tbody');
+
+          const stopBadge = (s) => {
+            const map = { Pending:'badge', OnTheWay:'badge warn', Delivered:'badge ok', Failed:'badge danger' };
+            return `<span class="${map[s] || 'badge'}">${s}</span>`;
+          };
+
+          function rowHtml(s) {
+            const plan = (s.plannedTime || '').toString().replace('T',' ').substring(0,16);
+            return `<tr id="stop-${s.id}">
+              <td>${s.stopNo}</td>
+              <td>${s.customer ?? '-'}</td>
+              <td>${s.address ?? '-'}</td>
+              <td>${s.orderId ?? '-'}</td>
+              <td>${plan}</td>
+              <td style="white-space:nowrap; display:flex; gap:6px; align-items:center">
+                ${stopBadge(s.status ?? 'Pending')}
+                <select onchange="updStop(${s.id}, this.value, '${s.orderId ?? ''}')">
+                  ${['Pending','OnTheWay','Delivered','Failed'].map(v=>`<option ${v===(s.status||'')?'selected':''}>${v}</option>`).join('')}
+                </select>
+              </td>
+              <td>
+                <select onchange="quick(${s.id}, this.value, '${s.orderId ?? ''}')">
+                  <option value="">Seç</option>
+                  <option value="Delivered">Yaptım</option>
+                  <option value="Failed">Yapmadım</option>
+                </select>
+              </td>
+              <td><button onclick="proof(${s.id})">Proof</button></td>
+            </tr>`;
+          }
+
+          async function load() {
+            $('#summary').textContent = 'Yükleniyor...';
+            try {
+              const r = await fetch('/api/driver/myroute', { credentials:'include' });
+              if (!r.ok) throw new Error('Status ' + r.status);
+              const js = await r.json();
+
+              if (js.message === 'no_route') {
+                $('#route').innerHTML = '<div class="muted">Henüz rota yok.</div>';
+                $tbody().innerHTML = '';
+                $('#summary').textContent = '';
+                return;
+              }
+
+              $('#route').innerHTML =
+                `<b>Araç:</b> ${js.vehicle ?? '-'} • <b>Tarih:</b> ${(js.routeDate || '').substring(0,10)}
+                 • <b>Durum:</b> ${js.status ?? '-'} • <b>RouteId:</b> ${js.id}`;
+
+              const ridEl = document.getElementById('rid'); if (ridEl) ridEl.value = js.id ?? '';
+
+              const stops = js.stops || [];
+              $tbody().innerHTML = stops.map(rowHtml).join('');
+
+              const total = stops.length;
+              const delivered = stops.filter(x=>x.status==='Delivered').length;
+              const failed = stops.filter(x=>x.status==='Failed').length;
+              $('#summary').textContent = `Durak: ${total} • Teslim: ${delivered} • Başarısız: ${failed}`;
+            } catch (e) {
+              $('#route').innerHTML = '<div class="muted">Rota yüklenemedi.</div>';
+              $('#summary').textContent = 'Hata: ' + (e?.message || e);
+              $tbody().innerHTML = '';
+            }
+          }
+
+          function patchStopLocal(id, status) {
+            const tr = document.getElementById('stop-' + id);
+            if (!tr) return;
+            tr.querySelector('td:nth-child(6) span').outerHTML = stopBadge(status);
+            const sel = tr.querySelector('td:nth-child(6) select');
+            if (sel) sel.value = status;
+          }
+
+          async function updStop(id, status, orderId) {
+            const prev = (document.querySelector('#stop-' + id)?.querySelector('td:nth-child(6) select')?.value) || 'Pending';
+            patchStopLocal(id, status);
+            try {
+              const r = await fetch('/api/driver/stop/' + id, {
+                method:'PUT', credentials:'include',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ status })
+              });
+              if (!r.ok) throw new Error('Status ' + r.status);
+
+              if(orderId && (status === 'Delivered' || status === 'Failed')){
+                const newStatus = (status === 'Delivered') ? 'delivered' : 'returned';
+                await fetch('/api/activities/order-status', {
+                  method:'POST', credentials:'include',
+                  headers:{'Content-Type':'application/json'},
+                  body: JSON.stringify({ orderId, status: newStatus, reason: status==='Failed'?'Teslim başarısız (sürücü)':null })
+                });
+              }
+            } catch (e) {
+              patchStopLocal(id, prev);
+              alert('Durum güncelleme hatası: ' + (e?.message || e));
+            }
+          }
+
+          async function proof(id) {
+            const code = prompt('Teslimat kodu (ProofCode):');
+            if (!code) return;
+            try {
+              const r = await fetch('/api/driver/stop/' + id, {
+                method:'PUT', credentials:'include',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ proofCode: code })
+              });
+              if (!r.ok) throw new Error('Status ' + r.status);
+              alert('Proof kaydedildi.');
+            } catch (e) {
+              alert('Proof hatası: ' + (e?.message || e));
+            }
+          }
+
+          async function mkRoute() {
+            const driverId = $('#drv').value;
+            const vehicle  = $('#veh').value || 'TR-34 ABC 123';
+            try {
+              const r = await fetch('/api/driver/route', {
+                method:'POST', credentials:'include',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ driverUserId: +driverId, vehicle })
+              });
+              if (!r.ok) throw new Error('Status ' + r.status);
+              await load();
+            } catch (e) { alert('Rota oluşturulamadı: ' + (e?.message || e)); }
+          }
+
+          async function mkStop() {
+            const dto = {
+              routeId: +$('#rid').value,
+              stopNo: +$('#st_no').value,
+              customer: $('#st_cust').value,
+              address: $('#st_addr').value,
+              orderId: $('#st_ord').value,
+              plannedTime: new Date($('#st_time').value).toISOString()
+            };
+            try {
+              const r = await fetch('/api/driver/stop', {
+                method:'POST', credentials:'include',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify(dto)
+              });
+              if (!r.ok) throw new Error('Status ' + r.status);
+              await load();
+            } catch (e) { alert('Durak eklenemedi: ' + (e?.message || e)); }
+          }
+
+          async function initAdmin() {
+            const sel = $('#drv'); if (!sel) return;
+            try {
+              const r = await fetch('/api/driver/drivers', { credentials:'include' });
+              if (!r.ok) return;
+              const list = await r.json();
+              sel.innerHTML = list.map(d => `<option value="${d.id}">${d.fullName} (${d.username})</option>`).join('');
+            } catch {  }
+          }
+
+          async function quick(id, val, orderId) { if (!val) return; await updStop(id, val, orderId); }
+
+          window.updStop = updStop;
+          window.proof   = proof;
+          window.mkRoute = mkRoute;
+          window.mkStop  = mkStop;
+          window.quick   = quick;
+
+          document.addEventListener('DOMContentLoaded', () => {
+            $('#btnDelay').addEventListener('click', async ()=>{
+              const orderId = prompt('Sipariş no (opsiyonel):') || '';
+              const routeId = ($('#rid')?.value || '');
+              const minutes = Number(prompt('Gecikme (dk):','20') || '0');
+              const reason  = prompt('Neden (trafik, arıza, hava...)','trafik') || 'trafik';
+
+              try{
+                await fetch('/api/activities/driver-delay', {
+                  method:'POST', credentials:'include',
+                  headers:{'Content-Type':'application/json'},
+                  body: JSON.stringify({ orderId, routeId, minutes, reason })
+                });
+                alert('Gecikme bildirildi.');
+              }catch(e){ alert('Gönderilemedi: ' + (e?.message||e)); }
+            });
+
+            initAdmin();
+            load();
+          });
+        })();
+    </script>
+}

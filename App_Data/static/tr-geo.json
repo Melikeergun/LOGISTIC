@@ -1,0 +1,60 @@
+﻿[
+  {
+    "il": "Ankara",
+    "ilce": "Çankaya",
+    "semt": "Kızılay",
+    "lat": 39.9208,
+    "lng": 32.8541
+  },
+  {
+    "il": "Ankara",
+    "ilce": "Etimesgut",
+    "semt": "Bağlıca",
+    "lat": 39.9446,
+    "lng": 32.6512
+  },
+  {
+    "il": "Ankara",
+    "ilce": "Yenimahalle",
+    "semt": "İvedik",
+    "lat": 39.9743,
+    "lng": 32.7757
+  },
+
+  {
+    "il": "İstanbul",
+    "ilce": "Kadıköy",
+    "semt": "Kozyatağı",
+    "lat": 40.9758,
+    "lng": 29.0940
+  },
+  {
+    "il": "İstanbul",
+    "ilce": "Kartal",
+    "semt": "Yakacık",
+    "lat": 40.9230,
+    "lng": 29.1857
+  },
+  {
+    "il": "İstanbul",
+    "ilce": "Beşiktaş",
+    "semt": "Levent",
+    "lat": 41.0821,
+    "lng": 29.0113
+  },
+
+  {
+    "il": "İzmir",
+    "ilce": "Konak",
+    "semt": "Alsancak",
+    "lat": 38.4333,
+    "lng": 27.1500
+  },
+  {
+    "il": "İzmir",
+    "ilce": "Karşıyaka",
+    "semt": "Bostanlı",
+    "lat": 38.4640,
+    "lng": 27.0860
+  }
+]

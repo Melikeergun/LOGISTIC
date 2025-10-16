@@ -1,0 +1,23 @@
+﻿@{
+    Layout = "_Layout";
+}
+@await Html.PartialAsync("_TokenBar")
+<section class="card">
+    <h2>Satınalma (PO Oluştur)</h2>
+    <p>Basit PoC: tedarikçi ve satırları girerek PO oluşturur.</p>
+    <div>
+        <input id="supId" placeholder="SupplierId" />
+        <textarea id="lines" rows="4" style="width:100%;max-width:640px" placeholder='[{"productId":1,"quantity":10,"unitPrice":12.5}]'></textarea>
+        <button class="btn" id="btn">Oluştur</button>
+    </div>
+</section>
+<script>
+    document.getElementById('btn').onclick = async ()=>{
+      const sup = parseInt(document.getElementById('supId').value||'0',10);
+      const lines = JSON.parse(document.getElementById('lines').value||"[]");
+      const t = localStorage.getItem('jwt')||'';
+      const r = await fetch('/api/erp/purchase',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify({supplierId:sup,lines})});
+      const js = await r.json();
+      alert('PO #' + js.id + ' oluşturuldu.');
+    };
+</script>

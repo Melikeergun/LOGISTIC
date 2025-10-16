@@ -1,0 +1,24 @@
+﻿@{
+    Layout = "_Layout";
+}
+<section class="card">
+    <h2>Görevlerim</h2>
+    <table id="tbl" style="width:100%">
+        <thead><tr><th>ID</th><th>Type</th><th>Loc</th><th>SKU</th><th>Qty</th><th>Status</th><th></th></tr></thead>
+        <tbody></tbody>
+    </table>
+</section>
+<script>
+    async function load(){
+      const r=await fetch('/api/warehouse/tasks',{credentials:'include'}); const js=await r.json();
+      tbl.querySelector('tbody').innerHTML = js.items.map(x=>`<tr>
+      <td>${x.id}</td><td>${x.type}</td><td>${x.location}</td><td>${x.sku}</td><td>${x.quantity}</td><td>${x.status}</td>
+      <td><button onclick="pick(${x.id})">Yaptım</button></td></tr>`).join('');
+    }
+    async function pick(id){
+      await fetch('/api/warehouse/tasks/'+id,{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body: JSON.stringify({status:'InProgress'})});
+      await fetch('/api/warehouse/tasks/'+id,{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body: JSON.stringify({status:'Done'})});
+      load();
+    }
+    document.addEventListener('DOMContentLoaded', load);
+</script>

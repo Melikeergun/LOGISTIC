@@ -1,0 +1,217 @@
+﻿@using System.Collections.Generic
+@{
+    Layout = "_Layout";
+    var wh = ViewBag.Warehouse;
+    var cts = (IEnumerable<MLYSO.Web.Models.Twin.ContainerType>)ViewBag.ContainerTypes;
+    var bts = (IEnumerable<MLYSO.Web.Models.Twin.BoxType>)ViewBag.BoxTypes;
+}
+@Html.AntiForgeryToken()
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/%40picocss/pico%402/css/pico.min.css" />
+
+<section class="container">
+    <h2>Depo Dijital İkizi</h2>
+    <p><small>Depo: @wh.Name (@wh.LengthMm x @wh.WidthMm x @wh.HeightMm mm)</small></p>
+
+    <article>
+        <header>Seçimler</header>
+        <div class="grid">
+            <div>
+                <h5>Konteyner(ler)</h5>
+                <div id="containers">
+                    @foreach (var ct in cts)
+                    {
+                        <div style="display:flex;gap:.5rem;align-items:center">
+                            <span>@ct.Code (@ct.InnerL x @ct.InnerW x @ct.InnerH)</span>
+                            <input type="number" min="0" value="0" data-ctid="@ct.Id" style="width:100px">
+                        </div>
+                    }
+                </div>
+            </div>
+            <div>
+                <h5>Koli(ler)</h5>
+                <div id="boxes">
+                    @foreach (var bt in bts)
+                    {
+                        <div style="display:flex;gap:.5rem;align-items:center">
+                            <span>@bt.Code (@bt.L x @bt.W x @bt.H)</span>
+                            <input type="number" min="0" value="0" data-bid="@bt.Id" style="width:100px">
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <footer>
+            <button id="optBtn">Optimize Et</button>
+            <span id="kpi"></span>
+        </footer>
+    </article>
+
+    <article>
+        <header>Depo Yerleşimi (2D)</header>
+        <canvas id="floor" width="900" height="500" style="border:1px solid var(--muted-border-color)"></canvas>
+    </article>
+
+    <article>
+        <header>Seçili Konteyner İç Yerleşim (3D)</header>
+        <div id="three" style="height:420px;border:1px solid var(--muted-border-color)"></div>
+    </article>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+    const wh = { L:@wh.LengthMm, W:@wh.WidthMm, H:@wh.HeightMm };
+    let lastPlan = null;
+
+    function getAntiForgeryToken(){
+      const el = document.querySelector('input[name="__RequestVerificationToken"]');
+      return el ? el.value : '';
+    }
+
+    document.getElementById('optBtn').onclick = async () => {
+      const ctInputs = [...document.querySelectorAll('#containers input')];
+      const btInputs = [...document.querySelectorAll('#boxes input')];
+      const ctMap = {}; ctInputs.forEach(i => ctMap[i.dataset.ctid] = parseInt(i.value||0));
+      const btMap = {}; btInputs.forEach(i => btMap[i.dataset.bid] = parseInt(i.value||0));
+
+      const res = await fetch('/api/twin/optimize', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'RequestVerificationToken': getAntiForgeryToken() },
+        body: JSON.stringify({ warehouseId:@wh.Id, mode:0, containerTypeIdToQty:ctMap, boxTypeIdToQty:btMap })
+      });
+      lastPlan = await res.json();
+      document.getElementById('kpi').textContent =
+        `Hacim Kullanımı: ${lastPlan.volumeUtilizationPct.toFixed(1)}% • Ağırlık Kullanımı: ${lastPlan.weightUtilizationPct.toFixed(1)}% • Kullanılan Konteyner: ${lastPlan.containersUsed}`;
+      drawFloor(lastPlan);
+    };
+
+    /** 2D Kat planı (RotDeg dikkate alınır) **/
+    function drawFloor(plan){
+      const cvs = document.getElementById('floor'), ctx = cvs.getContext('2d');
+      ctx.clearRect(0,0,cvs.width,cvs.height);
+      const sx = cvs.width / wh.L, sy = cvs.height / wh.W;
+
+      // depo sınırı
+      ctx.strokeStyle='#808080';
+      ctx.strokeRect(0,0,wh.L*sx, wh.W*sy);
+
+      // çiz & etiketle
+      plan.placements.forEach((p,idx) => {
+        // RotDeg=90 ise L/W takas
+        const isRot = (p.rotDeg ?? p.RotDeg) === 90;
+        const L = (isRot ? p.container.dim.innerW : p.container.dim.innerL) * sx;
+        const W = (isRot ? p.container.dim.innerL : p.container.dim.innerW) * sy;
+        const x = p.x * sx, y = p.y * sy;
+
+        ctx.fillStyle = `hsl(${(idx*53)%360} 60% 60%)`;
+        ctx.fillRect(x,y,L,W);
+        ctx.strokeStyle = '#202020';
+        ctx.strokeRect(x,y,L,W);
+
+        ctx.fillStyle='#000';
+        ctx.font = '12px system-ui';
+        ctx.fillText(`${p.container.code}`, x+4, y+14);
+      });
+
+      // tıklama ile 3D'yi göster
+      cvs.onclick = (e)=>{
+        const rect = cvs.getBoundingClientRect();
+        const mx = (e.clientX-rect.left)/ (rect.width) * cvs.width;
+        const my = (e.clientY-rect.top)/ (rect.height) * cvs.height;
+        const hit = plan.placements.find(p=>{
+          const isRot = (p.rotDeg ?? p.RotDeg) === 90;
+          const Lp = (isRot ? p.container.dim.innerW : p.container.dim.innerL) * sx;
+          const Wp = (isRot ? p.container.dim.innerL : p.container.dim.innerW) * sy;
+          const x=p.x*sx, y=p.y*sy;
+          return mx>=x && mx<=x+Lp && my>=y && my<=y+Wp;
+        });
+        if(hit) render3D(hit);
+      };
+
+      // varsayılan olarak kutusu olan ilk konteyneri göster; yoksa ilkini
+      const first = plan.placements.find(p => (p.boxes?.length || 0) > 0) ?? plan.placements[0];
+      if(first) render3D(first);
+    }
+
+    /** 3D render (kutu + konteyner birlikte) **/
+    function render3D(p){
+      const host = document.getElementById('three');
+      host.innerHTML='';
+
+      // 1 birim = 10 mm
+      const SCALE = 0.1;
+      const S  = v => v * SCALE;
+
+      const L = S(p.container.dim.innerL);
+      const W = S(p.container.dim.innerW);
+      const H = S(p.container.dim.innerH);
+
+      const scene = new THREE.Scene();
+      const cam = new THREE.PerspectiveCamera(55, host.clientWidth/host.clientHeight, 0.1, 100000);
+      const renderer = new THREE.WebGLRenderer({antialias:true});
+      renderer.setSize(host.clientWidth, host.clientHeight);
+      renderer.setClearColor(0x0b0f14);
+      host.appendChild(renderer.domElement);
+
+      // ışıklar
+      scene.add(new THREE.AmbientLight(0xffffff, .9));
+      const dl = new THREE.DirectionalLight(0xffffff, .7); dl.position.set(2,-1,3); scene.add(dl);
+
+      // === pivot: konteyner MERKEZİ ===
+      const pivot = new THREE.Group();
+      pivot.position.set(L/2, W/2, H/2); // merkez
+      scene.add(pivot);
+
+      // tel-kafes konteyner (merkezde)
+      const frameGeom = new THREE.BoxGeometry(L, W, H);
+      const wire = new THREE.WireframeGeometry(frameGeom);
+      const frame = new THREE.LineSegments(wire, new THREE.LineBasicMaterial({opacity:0.9, transparent:true}));
+      pivot.add(frame);
+
+      // kutular — merkez referansa göre yerleştir
+      (p.boxes || []).forEach((b,i)=>{
+        const l = S(b.size.l), w = S(b.size.w), h = S(b.size.h);
+        const mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(l, w, h),
+          new THREE.MeshPhongMaterial({transparent:true, opacity:0.88, color: new THREE.Color(`hsl(${(i*37)%360},60%,60%)`)})
+        );
+        mesh.position.set(
+          S(b.x) + l/2 - L/2,
+          S(b.y) + w/2 - W/2,
+          S(b.z) + h/2 - H/2
+        );
+        pivot.add(mesh);
+      });
+
+      // kamera kadrajı
+      const diag = Math.sqrt(L*L + W*W + H*H);
+      cam.position.set(0, -diag*0.8, diag*0.7);
+      cam.lookAt(L/2, W/2, H/2);
+
+      // Orbit controls
+      let controls = null;
+      if (THREE.OrbitControls) {
+        controls = new THREE.OrbitControls(cam, renderer.domElement);
+        controls.target.set(L/2, W/2, H/2);
+        controls.update();
+      }
+
+      // animasyon: pivotu döndür (kutu+konteyner beraber)
+      const animate = ()=>{
+        requestAnimationFrame(animate);
+        pivot.rotation.z += 0.002;
+        renderer.render(scene, cam);
+      };
+      animate();
+
+      // responsive
+      const onResize = ()=>{
+        cam.aspect = host.clientWidth/host.clientHeight;
+        cam.updateProjectionMatrix();
+        renderer.setSize(host.clientWidth, host.clientHeight);
+        controls?.update();
+      };
+      window.addEventListener('resize', onResize, { passive:true });
+    }
+</script>

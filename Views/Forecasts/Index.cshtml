@@ -1,0 +1,274 @@
+﻿@using MLYSO.Web.Models.Twin
+@{
+    Layout = "_Layout";
+    var whs = (IEnumerable<Warehouse>)ViewBag.Warehouses;
+    var skus = (IEnumerable<string>)ViewBag.Skus;
+}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/%40picocss/pico@2/css/pico.min.css" />
+
+<style>
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(6,minmax(140px,1fr));
+        gap: 10px;
+        margin-bottom: 12px
+    }
+
+    .kpi {
+        border: 1px solid #243242;
+        border-radius: 10px;
+        padding: 10px;
+        background: #0b1726
+    }
+
+        .kpi .k {
+            opacity: .7;
+            font-size: .85rem
+        }
+
+        .kpi .v {
+            font-weight: 700;
+            font-size: 1.05rem
+        }
+
+    @@media (max-width: 1200px) {
+        .kpi-grid {
+            grid-template-columns: repeat(3,minmax(140px,1fr));
+        }
+    }
+
+    @@media (max-width: 700px) {
+        .kpi-grid {
+            grid-template-columns: repeat(2,minmax(140px,1fr));
+        }
+    }
+
+    .param-grid {
+        display: grid;
+        grid-template-columns: repeat(6,minmax(160px,1fr));
+        gap: 10px
+    }
+
+    @@media (max-width: 1200px) {
+        .param-grid {
+            grid-template-columns: repeat(3,minmax(160px,1fr));
+        }
+    }
+</style>
+
+<main class="container">
+    <h2>Tahminleme</h2>
+
+    <article>
+        <header>Parametreler</header>
+        <div class="param-grid">
+            <label>
+                Depo
+                <select id="warehouseId">
+                    @foreach (var w in whs)
+                    {
+                        <option value="@w.Id">@w.Name</option>
+                    }
+                </select>
+            </label>
+
+            <label>
+                SKU (Kutu Kodu)
+                <select id="skuCode">
+                    @foreach (var s in skus)
+                    {
+                        <option value="@s">@s</option>
+                    }
+                </select>
+            </label>
+
+            <label>
+                Zaman Kovası
+                <select id="bucket">
+                    <option value="W" selected>Haftalık</option>
+                    <option value="M">Aylık</option>
+                    <option value="D">Günlük</option>
+                </select>
+            </label>
+
+            <label>
+                Model
+                <select id="model">
+                    <option value="AUTO" selected>Otomatik</option>
+                    <option value="SES">SES</option>
+                    <option value="HOLT">Holt (trend)</option>
+                    <option value="HW">Holt-Winters (mevsimsel)</option>
+                </select>
+            </label>
+
+            <label>
+                Ufuk (dönem)
+                <input id="horizon" type="number" min="1" step="1" value="8" />
+            </label>
+
+            <label>
+                Backtest (son K)
+                <input id="backtest" type="number" min="0" step="1" value="6" />
+            </label>
+
+            <label>
+                Alpha (α)
+                <input id="alpha" type="text" placeholder="boş: auto" />
+            </label>
+
+            <label>
+                Beta (β)
+                <input id="beta" type="text" placeholder="Holt/HW" />
+            </label>
+
+            <label>
+                Gamma (γ)
+                <input id="gamma" type="text" placeholder="HW" />
+            </label>
+
+            <label>
+                Sezon Uzunluğu (m)
+                <input id="seasonLen" type="number" min="2" step="1" value="12" />
+            </label>
+
+            <label style="display:flex;align-items:center;gap:8px">
+                <input id="optimize" type="checkbox" checked /> Parametreleri optimize et
+            </label>
+
+            <label style="display:flex;align-items:center;gap:8px">
+                <input id="conf" type="checkbox" checked /> Güven aralığı (95%)
+            </label>
+        </div>
+        <footer style="display:flex;gap:8px">
+            <button id="btnRun" class="primary">Tahminle</button>
+            <a id="btnCsv" class="btn" href="javascript:void(0)">CSV İndir</a>
+        </footer>
+    </article>
+
+    <article>
+        <header>Özet</header>
+        <div class="kpi-grid">
+            <div class="kpi"><div class="k">Model</div><div id="kModel" class="v">–</div></div>
+            <div class="kpi"><div class="k">Veri Noktası</div><div id="kPoints" class="v">–</div></div>
+            <div class="kpi"><div class="k">Alpha</div><div id="kAlpha" class="v">–</div></div>
+            <div class="kpi"><div class="k">Beta</div><div id="kBeta" class="v">–</div></div>
+            <div class="kpi"><div class="k">Gamma</div><div id="kGamma" class="v">–</div></div>
+            <div class="kpi"><div class="k">Ortalama</div><div id="kAvg" class="v">–</div></div>
+            <div class="kpi"><div class="k">Toplam</div><div id="kSum" class="v">–</div></div>
+            <div class="kpi"><div class="k">Min</div><div id="kMin" class="v">–</div></div>
+            <div class="kpi"><div class="k">Maks</div><div id="kMax" class="v">–</div></div>
+            <div class="kpi"><div class="k">Son Gerçekleşen</div><div id="kLast" class="v">–</div></div>
+            <div class="kpi"><div class="k">İlk Tahmin</div><div id="kNext" class="v">–</div></div>
+            <div class="kpi"><div class="k">Beklenen Değişim</div><div id="kGrowth" class="v">–</div></div>
+            <div class="kpi"><div class="k">RMSE (train)</div><div id="kRmse" class="v">–</div></div>
+            <div class="kpi"><div class="k">MAPE (train)</div><div id="kMape" class="v">–</div></div>
+            <div class="kpi"><div class="k">RMSE (test)</div><div id="kTRmse" class="v">–</div></div>
+            <div class="kpi"><div class="k">MAPE (test)</div><div id="kTMape" class="v">–</div></div>
+        </div>
+    </article>
+
+    <article>
+        <header>Gerçekleşen vs Tahmin</header>
+        <canvas id="fcChart" height="140"></canvas>
+    </article>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script>
+    const $ = s=>document.querySelector(s);
+    let chart = null;
+
+    function numFromBox(id){
+      const t = ($(id).value || "").trim().replace(",", ".");
+      return t ? Number(t) : null;
+    }
+
+    $("#btnCsv").onclick = () => {
+      const q = new URLSearchParams({
+        warehouseId: $("#warehouseId").value,
+        skuCode: $("#skuCode").value,
+        bucket: $("#bucket").value
+      }).toString();
+      location.href = "/api/forecasts/export?" + q;
+    };
+
+    $("#btnRun").onclick = async () => {
+      const payload = {
+        warehouseId: parseInt($("#warehouseId").value,10),
+        skuCode: $("#skuCode").value,
+        bucket: $("#bucket").value,
+        model: $("#model").value,
+        horizon: parseInt($("#horizon").value,10),
+        backtest: parseInt($("#backtest").value||"0",10),
+        seasonLen: parseInt($("#seasonLen").value||"12",10),
+        optimize: $("#optimize").checked,
+        conf: $("#conf").checked,
+        alpha: numFromBox("#alpha"),
+        beta: numFromBox("#beta"),
+        gamma: numFromBox("#gamma")
+      };
+
+      let res;
+      try{
+        res = await fetch("/api/forecasts", {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify(payload)
+        });
+      }catch(e){
+        console.error(e); alert("Tahminleme hatası\nİstemci bağlantısı.");
+        return;
+      }
+      const txt = await res.text().catch(()=> "");
+      if(!res.ok){
+        try{ const j = JSON.parse(txt); alert("Tahminleme hatası\n"+(j.error||txt)); }
+        catch{ alert("Tahminleme hatası\n"+txt); }
+        return;
+      }
+      const data = JSON.parse(txt);
+
+      // Özet
+      const s = data.stats || {};
+      const fmt = n => (n==null || Number.isNaN(n)) ? "–" : n.toLocaleString("tr-TR",{maximumFractionDigits:2});
+      $("#kModel").textContent   = s.model || "–";
+      $("#kPoints").textContent  = s.points ?? "–";
+      $("#kAlpha").textContent   = s.alpha!=null ? s.alpha.toFixed(2) : "–";
+      $("#kBeta").textContent    = s.beta!=null ? s.beta.toFixed(2) : "–";
+      $("#kGamma").textContent   = s.gamma!=null ? s.gamma.toFixed(2) : "–";
+      $("#kAvg").textContent     = fmt(s.avg);
+      $("#kSum").textContent     = fmt(s.sum);
+      $("#kMin").textContent     = fmt(s.min);
+      $("#kMax").textContent     = fmt(s.max);
+      $("#kLast").textContent    = fmt(s.lastActual);
+      $("#kNext").textContent    = fmt(s.nextForecast);
+      $("#kGrowth").textContent  = (s.growthPct==null) ? "–" : s.growthPct.toFixed(1)+" %";
+      $("#kRmse").textContent    = fmt(s.rmse);
+      $("#kMape").textContent    = (s.mape==null) ? "–" : s.mape.toFixed(1)+" %";
+      $("#kTRmse").textContent   = fmt(s.testRmse);
+      $("#kTMape").textContent   = (s.testMape==null) ? "–" : s.testMape.toFixed(1)+" %";
+
+      // Grafik
+      const labels = data.labels.concat(Array((payload.horizon||0)).fill(""));
+      const ctx = document.getElementById("fcChart").getContext("2d");
+      if(chart){ chart.destroy(); }
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label:"CI Alt", data: data.ciLow, borderWidth:0, pointRadius:0, fill:false },
+            { label:"CI Üst", data: data.ciHigh, borderWidth:0, pointRadius:0,
+              backgroundColor:"rgba(100,160,255,0.12)", fill: "-1" },
+            { label:"Gerçekleşen", data: data.actual, spanGaps:true, tension:.2 },
+            { label:"Tahmin", data: data.forecast, borderDash:[6,6], spanGaps:true, tension:.2 }
+          ]
+        },
+        options: {
+          responsive:true,
+          interaction:{ mode:"index", intersect:false },
+          plugins:{ legend:{ labels:{ usePointStyle:true } } },
+          scales:{ y:{ beginAtZero:true } }
+        }
+      });
+    };
+</script>

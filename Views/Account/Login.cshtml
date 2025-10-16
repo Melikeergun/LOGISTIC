@@ -1,0 +1,40 @@
+﻿@{
+    Layout = "_PublicLayout";
+    var returnUrl = (ViewBag.ReturnUrl as string) ?? "/ui";
+}
+<section class="auth-hero">
+    <video class="auth-video" autoplay muted loop playsinline>
+        <source src="/media/account.mp4" type="video/mp4" />
+    </video>
+    <div class="auth-overlay"></div>
+
+    <div class="auth-card">
+        <h2>Giriş Yap</h2>
+
+        <form method="post" action="/account/login">
+            @Html.AntiForgeryToken()
+
+            <!-- returnUrl'ü form ile gönder -->
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
+
+            @Html.ValidationSummary(excludePropertyErrors: true, message: "", htmlAttributes: new { @class = "text-warn mb" })
+
+            <div class="mb">
+                <label>Kullanıcı Adı</label>
+                <input name="username" autocomplete="username" required />
+            </div>
+            <div class="mb">
+                <label>Şifre</label>
+                <input type="password" name="password" autocomplete="current-password" required />
+            </div>
+            <div class="mb">
+                <label><input type="checkbox" name="rememberMe" value="true" checked /> Beni hatırla</label>
+            </div>
+            <button class="btn primary" type="submit">Giriş</button>
+        </form>
+
+        <p class="muted" style="margin-top:10px">
+            Hesabın yok mu? <a href="/account/register">Kayıt ol</a>
+        </p>
+    </div>
+</section>

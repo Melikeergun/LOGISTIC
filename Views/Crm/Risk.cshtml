@@ -1,0 +1,53 @@
+﻿@using MLYSO.Web.Models
+@{
+    Layout = "_Layout";
+}
+<section class="card">
+    <h2>CRM – Risk</h2>
+
+    <div class="grid" style="grid-template-columns: repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:8px">
+        <input id="fltCust" placeholder="Müşteri" />
+        <select id="fltSeg"><option value="">(Hepsi)</option><option>B2B</option><option>B2C</option></select>
+        <input id="fltTake" type="number" value="20" />
+        <input id="newNote" placeholder="Not" />
+        <button onclick="add()">Ekle</button>
+    </div>
+
+    <table id="tbl" style="width:100%">
+        <thead><tr><th>No</th><th>Müşteri</th><th>Segment</th><th>Risk</th><th>Not</th><th>İşlem</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</section>
+<script>
+    async function load(){
+      const seg = document.getElementById('fltSeg').value || '';
+      const cust = document.getElementById('fltCust').value || '';
+      const take = parseInt(document.getElementById('fltTake').value||'20',10);
+      const r = await fetch(`/api/crm/risk?take=${take}&cust=${encodeURIComponent(cust)}&seg=${encodeURIComponent(seg)}`,{credentials:'include'});
+      const js = await r.json();
+      tbl.querySelector('tbody').innerHTML = (js.items||[]).map((x,i)=>`
+        <tr>
+          <td>${x.id}</td>
+          <td>${x.customer}</td>
+          <td>${x.segment}</td>
+          <td contenteditable onblur="upd(${x.id}, this.innerText, null)">${x.risk}</td>
+          <td contenteditable onblur="upd(${x.id}, null, this.innerText)">${x.note??''}</td>
+          <td><button onclick="upd(${x.id}, prompt('Yeni risk', x.risk), prompt('Not', x.note||''))">Güncelle</button></td>
+        </tr>`).join('');
+    }
+    async function add(){
+      const cust = prompt('Müşteri Kodu:'); if(!cust) return;
+      const seg = prompt('Segment (B2B/B2C):','B2B'); if(!seg) return;
+      const risk = parseInt(prompt('Risk (0-100):','10')||'10',10);
+      const note = document.getElementById('newNote').value || null;
+      await fetch('/api/crm/risk',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer:cust, segment:seg, risk, note})});
+      load();
+    }
+    async function upd(id, risk, note){
+      const dto = {};
+      if(risk!==null && risk!==undefined && risk!=='') dto['risk']=parseInt(risk,10);
+      if(note!==null) dto['note']=note;
+      await fetch('/api/crm/risk/'+id,{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(dto)});
+    }
+    document.addEventListener('DOMContentLoaded', load);
+</script>

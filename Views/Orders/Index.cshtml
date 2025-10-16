@@ -1,0 +1,302 @@
+@using MLYSO.Web.Models
+@{
+    Layout = "_Layout";
+    ViewBag.Title = "Siparişler";
+    var isAdmin = User.IsInRole(Roles.Admin);
+    var isOps = isAdmin || User.IsInRole(Roles.Operations) || User.IsInRole(Roles.Planning) || User.IsInRole(Roles.Logistics);
+}
+<section class="page-hero">
+    <h1>🧾 Siparişler</h1>
+    <p>Arama, filtre ve CSV dışa aktarma ile sipariş yönetimi.</p>
+</section>
+
+<section class="app-container">
+    <div class="card">
+        <div class="flex" style="align-items:end; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div>
+                <h3 style="margin:0 0 10px">Filtreler</h3>
+                <div class="grid-3" style="gap:10px; min-width:820px; max-width:1080px">
+                    <div>
+                        <label class="label">Arama (Sipariş / Müşteri / SKU)</label>
+                        <input id="fQ" class="input" placeholder="ORD-1001, Ada Gıda, SKU-APPLE-1KG" />
+                    </div>
+                    <div>
+                        <label class="label">Durum</label>
+                        <select id="fStatus" class="input">
+                            <option value="">Hepsi</option>
+                            <option>created</option>
+                            <option>approved</option>
+                            <option>invoiced</option>
+                            <option>shipped</option>
+                            <option>delivered</option>
+                            <option>canceled</option>
+                            <option>returned</option>
+                        </select>
+                    </div>
+                    <div class="grid-2" style="gap:10px">
+                        <div>
+                            <label class="label">Tarih (Başlangıç)</label>
+                            <input id="fFrom" type="date" class="input" />
+                        </div>
+                        <div>
+                            <label class="label">Tarih (Bitiş)</label>
+                            <input id="fTo" type="date" class="input" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label">Görüntüleme</label>
+                        <select id="fTake" class="input"><option>50</option><option selected>100</option><option>200</option><option>500</option></select>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:end">
+                        <button id="btnReload" class="btn primary">Yükle</button>
+                        <button id="btnClear" class="btn ghost">Temizle</button>
+                        <button id="btnCsv" class="btn ghost">CSV</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="msg" class="muted" style="margin-top:10px"></div>
+
+        <div style="overflow:auto; margin-top:10px">
+            <table id="tbl" class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Tarih</th>
+                        <th>Müşteri</th>
+                        <th>SKU</th>
+                        <th>Adet</th>
+                        <th>Tutar</th>
+                        <th>Durum</th>
+                        <th>Uyarı</th>  
+                        @if (isOps)
+                        {
+                            <th>İşlem</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="flex" style="justify-content:space-between; align-items:center; margin-top:14px">
+            <div id="info" class="muted"></div>
+            <div class="flex" style="gap:8px">
+                <button id="prev" class="btn ghost">Önceki</button>
+                <button id="next" class="btn">Sonraki</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid #14263b;
+        background: #0f1b2d;
+        color: #e9f5ff;
+        font-size: 12px
+    }
+
+        .badge.ok {
+            background: #113a2e;
+            border-color: #1fbf8f
+        }
+
+        .badge.warn {
+            background: #3a3211;
+            border-color: #ffd166
+        }
+
+        .badge.danger {
+            background: #3a1616;
+            border-color: #ff6b6b
+        }
+</style>
+
+@section Scripts {
+    <script>
+        (() => {
+          const $ = (s) => document.querySelector(s);
+          const $tbody = () => $('#tbl').querySelector('tbody');
+
+          let ALERTS = {};
+
+          const staticOrders = [
+            { id:"ORD-1001", date:"2025-09-03T10:12:00Z", customer:"Ada Gıda",      sku:"SKU-APPLE-1KG", quantity:12, amount: 768.00, status:"created"   },
+            { id:"ORD-1002", date:"2025-09-03T12:40:00Z", customer:"Beta Kimya",    sku:"SKU-ETHANOL-5L", quantity:4,  amount: 920.50, status:"approved"  },
+            { id:"ORD-1003", date:"2025-09-03T15:05:00Z", customer:"Cem Market",    sku:"SKU-MILK-1L",    quantity:48, amount: 960.00, status:"invoiced"  },
+            { id:"ORD-1004", date:"2025-09-04T08:25:00Z", customer:"Deniz Ecza",    sku:"SKU-MASK-N95",   quantity:30, amount: 750.00, status:"shipped"   },
+            { id:"ORD-1005", date:"2025-09-04T11:15:00Z", customer:"Eksen Tekstil", sku:"SKU-THREAD-BL",  quantity:20, amount: 640.00, status:"delivered" },
+            { id:"ORD-1006", date:"2025-09-04T13:50:00Z", customer:"Fora İnşaat",   sku:"SKU-CEMENT-25",  quantity:10, amount: 500.00, status:"canceled"  },
+            { id:"ORD-1007", date:"2025-09-04T16:22:00Z", customer:"Gama Lojistik", sku:"SKU-PALLET-STD", quantity:8,  amount: 400.00, status:"returned"  },
+            { id:"ORD-1008", date:"2025-09-05T09:00:00Z", customer:"Hepsi Med",     sku:"SKU-GLOVES-S",   quantity:60, amount: 780.00, status:"delivered" },
+            { id:"ORD-1009", date:"2025-09-05T11:45:00Z", customer:"Işık Market",   sku:"SKU-RICE-5KG",   quantity:25, amount:1125.00, status:"shipped"   },
+            { id:"ORD-1010", date:"2025-09-05T14:10:00Z", customer:"Jale Kozmetik", sku:"SKU-SOAP-LIQ",   quantity:15, amount: 525.00, status:"approved"  }
+          ];
+
+          const badge = (s) => {
+            const map = { created:'badge', approved:'badge', invoiced:'badge', shipped:'badge warn', delivered:'badge ok', canceled:'badge danger', returned:'badge danger' };
+            return `<span class="${map[s] || 'badge'}">${s || '-'}</span>`;
+          };
+
+          const state = { all: [], page: 0, pageSize: 100 };
+
+          function normalizedQuery(){
+            const q = ($('#fQ').value || '').trim().toLowerCase();
+            return q.length >= 2 ? q : '';
+          }
+
+          function warnText(orderId){
+            return ALERTS[orderId] ? `<span class="badge warn">${ALERTS[orderId]}</span>` : '';
+          }
+
+          function rowHtml(x, canAct){
+            const id = x.orderId ?? x.id ?? '-';
+            const dtStr = (x.orderDate || x.date || '').toString();
+            const dt = dtStr ? dtStr.replace('T',' ').substring(0,16) : '-';
+            const cust = x.customerName || x.customer || '-';
+            const sku = x.sku || '-';
+            const qty = x.quantity ?? x.qty ?? 0;
+            const amt = (x.amount ?? x.total ?? 0).toLocaleString('tr-TR');
+            const st  = String(x.status || '').toLowerCase();
+
+            return `<tr>
+              <td>${id}</td>
+              <td>${dt}</td>
+              <td>${cust}</td>
+              <td>${sku}</td>
+              <td>${qty}</td>
+              <td>${amt} ₺</td>
+              <td>${badge(st)}</td>
+              <td>${warnText(id)}</td>
+              ${canAct ? `<td><button class="btn ghost" onclick="details('${id}')">Detay</button></td>` : ''}
+            </tr>`;
+          }
+
+          function filterLocal(list){
+            const q = normalizedQuery();
+            const st = $('#fStatus').value;
+            const from = $('#fFrom').value ? new Date($('#fFrom').value) : null;
+            const to   = $('#fTo').value   ? new Date($('#fTo').value)   : null;
+
+            return list.filter(x=>{
+              const txt = `${x.orderId ?? x.id ?? ''} ${x.customerName ?? x.customer ?? ''} ${x.sku ?? ''}`.toLowerCase();
+              const okQ = q ? txt.includes(q) : true;
+              const okS = st ? String(x.status||'').toLowerCase() === st.toLowerCase() : true;
+
+              const dtStr = x.orderDate || x.date;
+              const dt = dtStr ? new Date(dtStr) : null;
+              const okFrom = from ? (dt ? dt >= from : false) : true;
+              const endOfTo = to ? new Date(to.getTime()+24*3600*1000-1) : null;
+              const okTo   = to   ? (dt ? dt <= endOfTo : false) : true;
+
+              return okQ && okS && okFrom && okTo;
+            });
+          }
+
+          async function loadAlerts(){
+            try{
+              const r = await fetch('/api/activities?take=200&entityType=Order', { credentials:'include' });
+              const items = await r.json();
+              const map = {};
+              if (Array.isArray(items)) {
+                items.forEach(a=>{
+                  const id = a.orderId || a.entityId;
+                  if(!id) return;
+                  if(a.code === 'DRIVER_DELAY')      map[id] = `⏱ ${a.delayMinutes||''} dk gecikme: ${a.reason||''}`;
+                  else if((a.code||'').startsWith('ORDER_')) map[id] = a.title + (a.reason?` – ${a.reason}`:'');
+                  else map[id] = a.title;
+                });
+              }
+              ALERTS = map;
+            }catch{ ALERTS = {}; }
+          }
+
+          function render(){
+            const canAct = @((isOps).ToString().ToLower());
+            state.pageSize = Number($('#fTake').value || 100);
+
+            const filtered = filterLocal(state.all);
+            const start = state.page * state.pageSize;
+            const pageItems = filtered.slice(start, start + state.pageSize);
+
+            $tbody().innerHTML = pageItems.map(r => rowHtml(r, canAct)).join('');
+            $('#info').textContent = `Toplam: ${filtered.length} • Sayfa: ${state.page+1}/${Math.max(1, Math.ceil(filtered.length/state.pageSize))}`;
+
+            $('#prev').disabled = state.page <= 0;
+            $('#next').disabled = start + state.pageSize >= filtered.length;
+          }
+
+          function toCsv(rows){
+            if(!rows.length) return '';
+            const headers = Object.keys(rows[0]);
+            const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+            return headers.map(esc).join(',') + '\n' + rows.map(r => headers.map(h => esc(r[h])).join(',')).join('\n');
+          }
+          function download(name, text){
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([text], {type:'text/csv;charset=utf-8;'}));
+            a.download = name; a.click(); URL.revokeObjectURL(a.href);
+          }
+
+          async function tryFetch(url){
+            const r = await fetch(url, { credentials:'include' });
+            if(!r.ok) throw new Error(`${url} → ${r.status} ${r.statusText}`);
+            const data = await r.json();
+            return Array.isArray(data) ? data : (data.items || data);
+          }
+
+          async function load(){
+            $('#msg').textContent = 'Yükleniyor...';
+            state.page = 0;
+
+            try {
+              const take = Number($('#fTake').value || 100);
+              const api1 = `/api/orders?take=${take}`;
+              const api2 = `/api/olist/orders?take=${take}`;
+
+              let js = await tryFetch(api1).catch(async _ => await tryFetch(api2));
+              if (!Array.isArray(js)) js = [];
+              state.all = js;
+
+              await loadAlerts();   
+              render();
+
+              $('#msg').textContent = js.length ? `Yüklendi: ${js.length} kayıt.` : 'Kayıt bulunamadı (API boş döndü).';
+              if (!js.length) {
+                state.all = staticOrders;
+                await loadAlerts();
+                render();
+                $('#msg').textContent += ' Statik örnekler gösteriliyor.';
+              }
+            } catch (e) {
+              state.all = staticOrders;
+              await loadAlerts();
+              render();
+              $('#msg').textContent = 'API okunamadı; statik örnekler gösteriliyor. Hata: ' + (e?.message || e);
+            }
+          }
+
+          document.addEventListener('DOMContentLoaded', ()=>{
+            $('#fQ').value = ''; $('#fStatus').value = ''; $('#fFrom').value = ''; $('#fTo').value = '';
+            $('#btnReload').addEventListener('click', load);
+            $('#btnClear').addEventListener('click', ()=>{ $('#fQ').value=''; $('#fStatus').value=''; $('#fFrom').value=''; $('#fTo').value=''; state.page=0; render(); });
+            $('#btnCsv').addEventListener('click', ()=>{ const rows = filterLocal(state.all); download(`orders_${new Date().toISOString().substring(0,10)}.csv`, toCsv(rows)); });
+
+            $('#fTake').addEventListener('change', load);
+            ['#fQ','#fFrom','#fTo'].forEach(s => $(s).addEventListener('keydown', e => { if (e.key==='Enter') render(); }));
+            $('#fStatus').addEventListener('change', render);
+            $('#prev').addEventListener('click', ()=>{ if(state.page>0){ state.page--; render(); }});
+            $('#next').addEventListener('click', ()=>{ state.page++; render(); });
+
+            load();
+          });
+
+          window.details = (id)=> alert(`Sipariş #${id} (demo)`);
+        })();
+    </script>
+}

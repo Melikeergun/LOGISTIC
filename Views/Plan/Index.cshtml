@@ -1,0 +1,254 @@
+﻿@using MLYSO.Web.Models
+@{
+    // Zaten varsa tekrar tanımlama; yoksa ekle:
+    var isAdmin = ViewBag.isAdmin as bool? ?? User.IsInRole(Roles.Admin);
+    var isLogistics = isAdmin || User.IsInRole(Roles.Logistics);
+}
+
+@if (isLogistics)
+{
+    <section class="card" style="margin-top:16px">
+        <div class="flex" style="justify-content:space-between; align-items:center">
+            <h2>🚚 Lojistik Paneli</h2>
+            <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; min-width:440px">
+                <select id="whSel"><option value="WH-01" selected>WH-01 (Merkez)</option><option value="WH-02">WH-02 (Ankara)</option></select>
+                <button class="ghost" onclick="logiReload()">Yenile</button>
+                <button onclick="location.href='/ui/warehouse'">Depo Yönetimine Git</button>
+            </div>
+        </div>
+
+        <!-- Üst KPI’lar -->
+        <div class="grid" style="grid-template-columns: repeat(4,minmax(0,1fr)); gap:8px; margin-top:8px">
+            <div class="subcard"><div class="muted">Depo Doluluk</div><div id="lg_occ" class="kpi-lg">—</div><div class="bar"><div id="lg_occ_bar"></div></div></div>
+            <div class="subcard"><div class="muted">Putaway Kuyruğu</div><div id="lg_put_qty" class="kpi-lg">—</div><div class="muted" id="lg_put_eta">—</div></div>
+            <div class="subcard"><div class="muted">Picking Backlog</div><div id="lg_pick_qty" class="kpi-lg">—</div><div class="muted" id="lg_pick_sla">—</div></div>
+            <div class="subcard"><div class="muted">Bugün Sevkiyat</div><div id="lg_ship_qty" class="kpi-lg">—</div><div class="muted" id="lg_ship_routes">—</div></div>
+        </div>
+
+        <!-- Izgaralar -->
+        <div class="grid" style="grid-template-columns: 1.2fr 1fr 1fr; gap:10px; margin-top:10px">
+            <!-- Dock Planı -->
+            <div class="subcard">
+                <div class="flex" style="justify-content:space-between; align-items:center">
+                    <h3>Rıhtım / Dock Planı (Bugün)</h3>
+                    <span id="dock_warn" class="badge danger" style="display:none">Çakışma!</span>
+                </div>
+                <table class="w100">
+                    <thead><tr><th>Slot</th><th>Saat</th><th>Plaka</th><th>Tür</th><th>Durum</th></tr></thead>
+                    <tbody id="tbl_dock"></tbody>
+                </table>
+            </div>
+
+            <!-- Gelen ASN’ler -->
+            <div class="subcard">
+                <h3>Gelen ASN’ler</h3>
+                <table class="w100">
+                    <thead><tr><th>#</th><th>Tedarikçi</th><th>Palet</th><th>ETA</th><th>Durum</th></tr></thead>
+                    <tbody id="tbl_asn"></tbody>
+                </table>
+            </div>
+
+            <!-- Düşük Stok & Uyarılar -->
+            <div class="subcard">
+                <h3>Düşük Stok (Top 8)</h3>
+                <ul id="low_list" class="list"></ul>
+                <h3 style="margin-top:10px">Rota Uyarıları</h3>
+                <ul id="route_alerts" class="list"></ul>
+            </div>
+        </div>
+
+        <!-- Operatör Görev Panosu -->
+        <div class="subcard" style="margin-top:10px">
+            <h3>Operatör Görev Panosu</h3>
+            <table class="w100">
+                <thead><tr><th>ID</th><th>Tür</th><th>Lokasyon</th><th>SKU</th><th>Adet</th><th>Durum</th><th>Hızlı</th></tr></thead>
+                <tbody id="tbl_tasks"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <style>
+        .subcard {
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 12px;
+        }
+
+        .w100 {
+            width: 100%;
+        }
+
+        .list li {
+            padding: 4px 0;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 6px
+        }
+
+        #lg_occ_bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg,#4aa6ff,#7dd3fc)
+        }
+
+        .tag {
+            padding: 2px 6px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            font-size: 12px
+        }
+    </style>
+
+    <script>
+        (() => {
+          const $ = s => document.querySelector(s);
+
+          // --- STATİK DATA (API yoksa) ---
+          const STATIC = {
+            WH: {
+              "WH-01": {
+                kpi: { occ: 78, putQty: 124, putEta:"~ 2.1 saat", pickQty: 86, pickSla:"%92 SLA", shipQty: 412, shipRoutes: "6 rota" },
+                dock: [
+                  { slot:"D1", time:"09:15", plate:"34 ABC 123", type:"Inbound", status:"Beklemede" },
+                  { slot:"D2", time:"10:30", plate:"06 MLY 501", type:"Outbound", status:"Yüklemede" },
+                  { slot:"D3", time:"11:00", plate:"34 XYZ 777", type:"Inbound", status:"Planlı" },
+                  { slot:"D2", time:"11:15", plate:"06 KGO 145", type:"Outbound", status:"Planlı" } // çakışma örneği
+                ],
+                asn: [
+                  { id:"ASN-2107", sup:"Eksen Tekstil", pallets:12, eta:"11:20", st:"Onaylandı" },
+                  { id:"ASN-2108", sup:"Beta Kimya",    pallets: 6, eta:"13:40", st:"Yolda" },
+                  { id:"ASN-2109", sup:"Hepsi Med",     pallets: 4, eta:"15:10", st:"Planlı" }
+                ],
+                low: [
+                  { sku:"SKU-GLOVES-S", loc:"A-01-02", qty:24,  th:50 },
+                  { sku:"SKU-THREAD-BL",loc:"B-03-01", qty:32,  th:60 },
+                  { sku:"SKU-MASK-N95", loc:"A-02-05", qty:18,  th:40 },
+                  { sku:"SKU-APPLE-1KG",loc:"C-01-01", qty:55,  th:120},
+                  { sku:"SKU-RICE-5KG", loc:"C-04-02", qty:20,  th:80 },
+                  { sku:"SKU-PALLET-STD",loc:"Y-00-00",qty:14,  th:30 },
+                  { sku:"SKU-ETHANOL-5L",loc:"K-02-03",qty:8,   th:25 },
+                  { sku:"SKU-MILK-1L",   loc:"C-02-07",qty:64,  th:100}
+                ],
+                routeAlerts: [
+                  { t:"10:05", txt:"Rota #102 teslim 20 dk gecikme (trafik yoğunluğu)." },
+                  { t:"11:30", txt:"Rota #106: müşteri adresinde kapalı — yeniden planlama gerekli." }
+                ],
+                tasks: [
+                  { id:1201, type:"Putaway", location:"A-01-01", sku:"SKU-GLOVES-S", quantity:30, status:"Open" },
+                  { id:1202, type:"Pick",    location:"C-02-07", sku:"SKU-MILK-1L",  quantity:12, status:"InProgress" },
+                  { id:1203, type:"Count",   location:"B-03-01", sku:"SKU-THREAD-BL",quantity:50, status:"Open" }
+                ]
+              },
+              "WH-02": {
+                kpi: { occ: 61, putQty: 42,  putEta:"~ 45 dk", pickQty: 33, pickSla:"%96 SLA", shipQty: 180, shipRoutes:"3 rota" },
+                dock: [
+                  { slot:"D1", time:"09:00", plate:"06 ANK 222", type:"Inbound", status:"Yüklemede" },
+                  { slot:"D2", time:"10:00", plate:"06 ANK 333", type:"Outbound", status:"Planlı" }
+                ],
+                asn: [
+                  { id:"ASN-3301", sup:"Anadolu Depo", pallets:8, eta:"12:10", st:"Yolda" }
+                ],
+                low: [
+                  { sku:"SKU-RICE-5KG", loc:"A-03-02", qty:14, th:60 },
+                  { sku:"SKU-PALLET-STD", loc:"Y-00-00", qty:10, th:30 }
+                ],
+                routeAlerts: [],
+                tasks: [
+                  { id:2201, type:"Pick", location:"A-03-02", sku:"SKU-RICE-5KG", quantity:10, status:"Open" }
+                ]
+              }
+            }
+          };
+
+          // --- RENDER ---
+          function renderKpi(k){
+            $('#lg_occ').textContent = k.occ + '%';
+            $('#lg_occ_bar').style.width = k.occ + '%';
+            $('#lg_put_qty').textContent = k.putQty;
+            $('#lg_put_eta').textContent = k.putEta;
+            $('#lg_pick_qty').textContent = k.pickQty;
+            $('#lg_pick_sla').textContent = k.pickSla;
+            $('#lg_ship_qty').textContent = k.shipQty;
+            $('#lg_ship_routes').textContent = k.shipRoutes;
+          }
+
+          const badge = (s) => {
+            const map = { Open:'badge', InProgress:'badge warn', Done:'badge ok', Planlı:'badge', Beklemede:'badge', Yüklemede:'badge warn', Yolda:'badge warn', Onaylandı:'badge ok' };
+            return `<span class="${map[s]||'badge'}">${s}</span>`;
+          };
+
+          function renderTables(wh){
+            const d = STATIC.WH[wh];
+
+            // Dock
+            $('#tbl_dock').innerHTML = d.dock.map(x =>
+              `<tr><td>${x.slot}</td><td>${x.time}</td><td>${x.plate}</td><td>${x.type}</td><td>${badge(x.status)}</td></tr>`
+            ).join('');
+
+            // Çakışma kontrolü (aynı slot & yakın saat)
+            const conflict = d.dock.some((a,i)=> d.dock.some((b,j)=> i<j && a.slot===b.slot && Math.abs(parseTime(a.time)-parseTime(b.time))<=20));
+            $('#dock_warn').style.display = conflict ? '' : 'none';
+
+            // ASN
+            $('#tbl_asn').innerHTML = d.asn.map(a =>
+              `<tr><td>${a.id}</td><td>${a.sup}</td><td>${a.pallets}</td><td>${a.eta}</td><td>${badge(a.st)}</td></tr>`
+            ).join('');
+
+            // Low stock
+            $('#low_list').innerHTML = d.low.map(x => {
+              const pct = Math.max(0, Math.min(100, Math.round((x.qty / x.th) * 100)));
+              return `<li><b>${x.sku}</b> <span class="muted">(${x.loc})</span>
+                      <div class="bar" style="margin-top:4px"><div style="width:${pct}%; background:${pct<50?'#ef4444':'#f59e0b'}; height:8px"></div></div>
+                      <span class="muted">${x.qty}/${x.th}</span></li>`;
+            }).join('');
+
+            // Route alerts
+            $('#route_alerts').innerHTML = (d.routeAlerts.length ? d.routeAlerts :
+              [{t:'—', txt:'Aktif uyarı yok'}]).map(r => `<li><b>${r.t}</b> — ${r.txt}</li>`).join('');
+
+            // Tasks
+            $('#tbl_tasks').innerHTML = d.tasks.map(x => `
+              <tr>
+                <td>${x.id}</td><td>${x.type}</td><td>${x.location}</td><td>${x.sku}</td><td>${x.quantity}</td>
+                <td><span class="tag">${x.status}</span></td>
+                <td>
+                  <select onchange="lgQuick(${x.id}, this.value)">
+                    <option value="">Seç</option>
+                    <option value="Done">Yaptım</option>
+                    <option value="Open">Yapmadım</option>
+                  </select>
+                </td>
+              </tr>`).join('');
+          }
+
+          function parseTime(hhmm){
+            const [h,m]=hhmm.split(':').map(Number); return h*60+m;
+          }
+
+          // Quick update (şimdilik sadece UI’da değiştirir)
+          window.lgQuick = (id, val) => {
+            if(!val) return;
+            const wh = $('#whSel').value;
+            const arr = STATIC.WH[wh].tasks;
+            const i = arr.findIndex(t=>t.id===id);
+            if(i>=0){ arr[i]={...arr[i], status: val==='Done'?'Done':'Open'}; renderTables(wh); }
+          };
+
+          window.logiReload = () => {
+            const wh = $('#whSel').value;
+            const d = STATIC.WH[wh];
+            renderKpi(d.kpi);
+            renderTables(wh);
+          };
+
+          document.addEventListener('DOMContentLoaded', logiReload);
+        })();
+    </script>
+}

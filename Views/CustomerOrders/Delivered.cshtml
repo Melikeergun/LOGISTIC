@@ -1,0 +1,13 @@
+﻿@model MLYSO.Web.Models.CustomerOrdersState
+@{
+    Layout = "_Layout";
+}
+<section class="card">
+    <h2>Teslimatlar</h2>
+    <ul>
+        @foreach (var o in Model.Orders.Where(x => x.Status == "Delivered"))
+        {
+            <li>@o.OrderNo — @o.DeliveredAt</li>
+        }
+    </ul>
+</section>

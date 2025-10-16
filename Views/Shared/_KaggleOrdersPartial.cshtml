@@ -1,0 +1,50 @@
+﻿<div class="card" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:0">Kaggle + Kullanıcı Siparişleri</h3>
+        <input id="qBrowse" placeholder="Ara (OrderId/Customer)" style="padding:6px 10px;border-radius:8px;border:1px solid #22314d;width:240px" />
+    </div>
+    <table id="browseTbl" class="table" style="width:100%;margin-top:10px">
+        <thead>
+            <tr>
+                <th>Kaynak</th>
+                <th>Order ID</th>
+                <th>Durum</th>
+                <th>Satın Alma</th>
+                <th>Teslim</th>
+                <th>Müşteri</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+    (function(){
+      const tbl = document.querySelector('#browseTbl tbody');
+      const q = document.getElementById('qBrowse');
+
+      async function load(skip=0, take=200){
+        const url = new URL('/api/orders/browse', location.origin);
+        url.searchParams.set('skip', skip);
+        url.searchParams.set('take', take);
+        if(q.value.trim()) url.searchParams.set('q', q.value.trim());
+
+        const res = await fetch(url, { method:'GET', credentials:'same-origin' });
+        if(res.status === 401){ location.href='/account/login?returnUrl='+encodeURIComponent(location.pathname); return; }
+        const rows = await res.json();
+
+        tbl.innerHTML = rows.map(r => `
+          <tr>
+            <td>${r.source}</td>
+            <td>${r.orderId}</td>
+            <td>${r.status||''}</td>
+            <td>${r.purchasedAt ? new Date(r.purchasedAt).toLocaleString() : ''}</td>
+            <td>${r.deliveredAt ? new Date(r.deliveredAt).toLocaleString() : ''}</td>
+            <td>${r.customerId||''}</td>
+          </tr>`).join('');
+      }
+
+      q?.addEventListener('keyup', (e)=>{ if(e.key==='Enter') load(); });
+      load();
+    })();
+</script>

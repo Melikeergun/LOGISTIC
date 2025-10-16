@@ -1,0 +1,37 @@
+{
+  "Orders": [
+    {
+      "Id": "ORD-1001",
+      "OrderNo": "SIP-2025-0001",
+      "Customer": "Melike K.",
+      "Status": "ReturnRequested",
+      "CreatedAt": "2025-08-31T12:46:33.4151052Z",
+      "DeliveredAt": "2025-09-04T07:10:27.5925342Z",
+      "ReturnRequestedAt": "2025-09-12T17:49:20.8584931Z",
+      "ReturnApprovedAt": null,
+      "ReturnReason": "b\u00FCy\u00FCk"
+    },
+    {
+      "Id": "ORD-1002",
+      "OrderNo": "SIP-2025-0002",
+      "Customer": "Ali V.",
+      "Status": "Delivered",
+      "CreatedAt": "2025-08-29T12:46:33.4151822Z",
+      "DeliveredAt": "2025-09-02T12:46:33.4151826Z",
+      "ReturnRequestedAt": null,
+      "ReturnApprovedAt": null,
+      "ReturnReason": null
+    },
+    {
+      "Id": "ORD-1003",
+      "OrderNo": "SIP-2025-0003",
+      "Customer": "Bora S.",
+      "Status": "ReturnRequested",
+      "CreatedAt": "2025-08-24T12:46:33.4152636Z",
+      "DeliveredAt": null,
+      "ReturnRequestedAt": "2025-09-01T12:46:33.4152639Z",
+      "ReturnApprovedAt": null,
+      "ReturnReason": "Beden uymad\u0131"
+    }
+  ]
+}

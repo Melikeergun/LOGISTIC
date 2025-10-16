@@ -1,0 +1,48 @@
+﻿@using System.Security.Claims
+@{
+    var isAuthenticated = (User?.Identity?.IsAuthenticated == true);
+}
+
+@if (!isAuthenticated)
+{
+    <div class="tokenbar">
+        <div>
+            <label>JWT Token:</label>
+            <input id="jwtInput" type="text" placeholder="Swagger'dan aldığın token'ı buraya yapıştır" />
+            <button type="button" class="btn" onclick="window.UI && UI.saveToken()">Kaydet</button>
+            <button type="button" class="btn" onclick="window.UI && UI.clearToken()">Sil</button>
+        </div>
+        <div id="meBox" class="muted">Oturum: (henüz yok)</div>
+    </div>
+
+    <style>
+        .tokenbar {
+            background: #121c33;
+            border: 1px solid #22314d;
+            border-radius: 12px;
+            padding: 12px;
+            margin: 10px 0
+        }
+
+            .tokenbar input {
+                width: 60%;
+                max-width: 680px
+            }
+
+        .btn {
+            background: #22314d;
+            color: #e9f5ff;
+            border: 0;
+            border-radius: 8px;
+            padding: 6px 10px;
+            margin-left: 6px;
+            cursor: pointer
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.UI && typeof UI.refreshMe === 'function') UI.refreshMe();
+        });
+    </script>
+}

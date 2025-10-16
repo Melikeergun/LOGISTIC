@@ -1,0 +1,108 @@
+@using System.Security.Claims
+@using MLYSO.Web.Models
+@{
+    var isAuth = User?.Identity?.IsAuthenticated ?? false;
+    var roleName = isAuth ? (User?.FindFirst(ClaimTypes.Role)?.Value ?? "") : "";
+    var who = User?.Identity?.Name ?? User?.FindFirst("sub")?.Value ?? "user";
+    var display = isAuth ? $"{who} ({roleName})" : "Misafir";
+
+    bool isAdmin = User?.IsInRole(Roles.Admin) ?? false;
+    bool isOps = isAdmin || (User?.IsInRole(Roles.Operations) ?? false) || (User?.IsInRole(Roles.Planning) ?? false) || (User?.IsInRole(Roles.Logistics) ?? false);
+    bool isWhMgr = isAdmin || (User?.IsInRole(Roles.WarehouseChief) ?? false) || (User?.IsInRole(Roles.WarehouseManager) ?? false);
+    bool isWhOp = isAdmin || (User?.IsInRole(Roles.WarehouseOperator) ?? false);
+    bool isDriver = isAdmin || (User?.IsInRole(Roles.Driver) ?? false);
+    bool isErp = isAdmin || (User?.IsInRole(Roles.Purchasing) ?? false);
+    bool isCrm = isAdmin || (User?.IsInRole(Roles.CustomerService) ?? false) || (User?.IsInRole(Roles.CrmAgent) ?? false);
+    bool isSupplier = isAdmin || (User?.IsInRole(Roles.Supplier) ?? false);
+    bool isCustomer = User?.IsInRole(Roles.Customer) ?? false;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    @RenderSection("Styles", required: false)
+    <meta charset="utf-8" />
+    <title>MLYSO</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="app">
+    <header class="topbar">
+        <div class="brand"><a href="/">MLYSO</a></div>
+
+        <nav class="menu">
+            @if (!isAuth)
+            {
+                <a href="/account/login" class="btn ghost">Giriş</a>
+                <a href="/account/register" class="btn primary">Kayıt Ol</a>
+            }
+            else
+            {
+                <a class="btn ghost" href="/roles/choose">Rol Değiştir</a>
+
+                @if (isCustomer)
+                {
+                    <a href="/ui/orders">Siparişler</a>
+                }
+
+                @if (isOps)
+                {
+                    <a href="/ui/plan">Planlama</a>
+                    <a href="/ui/dashboard">KPI</a>
+                    <a href="/forecasts">Tahminler</a>
+                }
+
+                @if (isWhMgr)
+                {
+                    <a href="/ui/warehouse">Depo Yönetimi</a>
+                }
+                @if (isWhOp)
+                {
+                    <a href="/ui/tasks">Görevlerim</a>
+                }
+                @if (isDriver)
+                {
+                    <a href="/ui/driver">Dağıtım</a>
+                }
+                @if (isErp)
+                {
+                    <a href="/ui/erp-purchase">Satın Alma</a>
+                }
+                @if (isCrm)
+                {
+                    <a href="/ui/crm-risk">CRM</a>
+                }
+                @if (isSupplier)
+                {
+                    <a href="/ui/supplier-asn">Tedarikçi</a>
+                }
+                @if (isAdmin)
+                {
+                    <a href="/swagger">Swagger</a>
+                }
+            }
+        </nav>
+
+        <div class="authbox">
+            <span class="user">@display</span>
+            @if (isAuth)
+            {
+                <form method="post" action="/account/logout" style="display:inline">
+                    @Html.AntiForgeryToken()
+                    <button class="btn ghost">Çıkış</button>
+                </form>
+            }
+        </div>
+    </header>
+
+    <main class="app-container">
+        @RenderBody()
+        @await Html.PartialAsync("_TokenBar")
+    </main>
+
+    <footer class="footer">
+        <p>© @DateTime.Now.Year MLYSO • .NET 8 MVC + JWT + Swagger</p>
+    </footer>
+
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

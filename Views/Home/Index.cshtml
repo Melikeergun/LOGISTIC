@@ -1,0 +1,152 @@
+@{
+    Layout = "~/Views/Shared/_PublicLayout.cshtml";
+    ViewData["Title"] = "MLYSO Logistics";
+    var brand = ViewBag.Brand as string ?? "MLYSO Logistics";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/landing.css" asp-append-version="true" />
+}
+
+<section class="lp-hero">
+    <video class="lp-video" autoplay muted loop playsinline poster="/img/hero-fallback.jpg">
+        <source src="/media/hero.mp4" type="video/mp4" />
+    </video>
+    <div class="lp-overlay"></div>
+    <div class="lp-content">
+        <h1><span>@brand</span><br />Uçtan Uca Akıllı Lojistik</h1>
+        <p class="lead">Depo, dağıtım ve satınalma süreçlerinizi tek platformda toplayın. Gerçek zamanlı takip, rol tabanlı yetkiler ve KPI odaklı karar desteği.</p>
+        <div class="cta">
+            <a href="/account/login" class="btn primary">Giriş Yap</a>
+            <a href="/account/register" class="btn ghost">Hemen Kayıt Ol</a>
+        </div>
+    </div>
+</section>
+
+<section class="lp-ribbons">
+    <button class="lp-ribbon" type="button" data-open="m-ops" aria-controls="m-ops" aria-expanded="false">
+        <h3>Akıllı Depo Operasyonları</h3>
+        <p>Raf yönetimi, dijital ikiz eşleşmesi ve iş emri akışı ile verimi artırın.</p>
+    </button>
+    <button class="lp-ribbon" type="button" data-open="m-plan" aria-controls="m-plan" aria-expanded="false">
+        <h3>Dinamik Dağıtım Planlama</h3>
+        <p>Rota, durak ve teslim kanıtı (PoD) süreçlerini sürücü uygulamasıyla yönetin.</p>
+    </button>
+    <button class="lp-ribbon" type="button" data-open="m-erp" aria-controls="m-erp" aria-expanded="false">
+        <h3>ERP Entegrasyonları</h3>
+        <p>Satınalma, teklif ve tedarikçi yönetimini tek tıkla bağlayın.</p>
+    </button>
+</section>
+
+<section class="lp-stats">
+    <div class="stat"><div class="num" data-k="120">0</div><div class="lbl">Aktif Rota/Gün</div></div>
+    <div class="stat"><div class="num" data-k="98">0</div><div class="lbl">Zamanında Teslim (%)</div></div>
+    <div class="stat"><div class="num" data-k="30">0</div><div class="lbl">Depo Verim Artışı (%)</div></div>
+    <div class="stat"><div class="num" data-k="15">0</div><div class="lbl">Maliyet Tasarrufu (%)</div></div>
+</section>
+
+<section class="lp-feats">
+    <article class="feat" role="button" tabindex="0" data-open="m-wms" aria-controls="m-wms" aria-expanded="false">
+        <div class="feat-media"><img src="/img/feat-warehouse.jpg" alt="Depo" loading="lazy" /></div>
+        <div class="feat-body">
+            <h4>Depo & WMS</h4>
+            <p>Görev akışı, sayım, raf düzeni ve dijital ikiz eşleşmesi.</p>
+        </div>
+    </article>
+
+    <article class="feat" role="button" tabindex="0" data-open="m-pod" aria-controls="m-pod" aria-expanded="false">
+        <div class="feat-media"><img src="/img/feat-distribution.jpg" alt="Dağıtım" loading="lazy" /></div>
+        <div class="feat-body">
+            <h4>Dağıtım & PoD</h4>
+            <p>Rota planı, sürücü uygulaması ve teslim kodu ile kanıt.</p>
+        </div>
+    </article>
+
+    <article class="feat" role="button" tabindex="0" data-open="m-erp" aria-controls="m-erp" aria-expanded="false">
+        <div class="feat-media"><img src="/img/feat-erp.jpg" alt="ERP" loading="lazy" /></div>
+        <div class="feat-body">
+            <h4>Satınalma & ERP</h4>
+            <p>Teklif/PO, tedarik yönetimi ve maliyet optimizasyonu.</p>
+        </div>
+    </article>
+</section>
+
+<section class="lp-cta">
+    <h3>Operasyonlarınızı tek panoda birleştirin</h3>
+    <p>Rol tabanlı erişim, JWT (cookie) güvenliği ve Swagger API ile modern mimari.</p>
+    <div>
+        <a class="btn primary" href="/account/login">Giriş Yap</a>
+        <a class="btn ghost" href="/swagger">API'yi Gör</a>
+    </div>
+</section>
+
+<section class="lp-faq">
+    <details open>
+        <summary>Platform nasıl çalışıyor?</summary>
+        <p>.NET 8 MVC + Web API ile; depo, dağıtım, ERP ve CRM süreçleri tek çatı altında yönetilir.</p>
+    </details>
+    <details>
+        <summary>Rollere göre yetkiler var mı?</summary>
+        <p>Evet. Admin, ERP, Operasyon, Lojistik, Depo, Sürücü, Müşteri vb. rollerle ekranlar filtrelenir.</p>
+    </details>
+    <details>
+        <summary>Verilerim güvenli mi?</summary>
+        <p>JWT (cookie) ile oturum, rol bazlı yetki ve audit log'lar varsayılan.</p>
+    </details>
+</section>
+
+<div class="lp-modal" id="m-wms" aria-hidden="true">
+    <div class="lp-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="m-wms-title" tabindex="-1">
+        <button class="lp-modal__close" type="button" data-close aria-label="Kapat">&times;</button>
+        <h3 id="m-wms-title">Depo & WMS</h3>
+        <p>Raf/dijital ikiz eşlemesi, lokasyon kapasite haritası, sayım ve iş emri akışı. Görevler “yaptım / yapmadım” ile izlenir ve kalıcı olarak log’lanır.</p>
+        <div class="modal-actions">
+            <a class="btn primary" href="/warehouse">Depo Paneline Git</a>
+            <a class="btn ghost" href="/docs/wms">Doküman</a>
+        </div>
+    </div>
+</div>
+
+<div class="lp-modal" id="m-pod" aria-hidden="true">
+    <div class="lp-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="m-pod-title" tabindex="-1">
+        <button class="lp-modal__close" type="button" data-close aria-label="Kapat">&times;</button>
+        <h3 id="m-pod-title">Dağıtım & PoD</h3>
+        <p>Rota/stop planı, canlı ilerleme, teslim kodu veya e-imza ile PoD. Sürücü mobilinden anlık durum ve KPI’lar.</p>
+        <div class="modal-actions">
+            <a class="btn primary" href="/routes">Rotaları Gör</a>
+            <a class="btn ghost" href="/docs/pod">PoD Rehberi</a>
+        </div>
+    </div>
+</div>
+
+<div class="lp-modal" id="m-erp" aria-hidden="true">
+    <div class="lp-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="m-erp-title" tabindex="-1">
+        <button class="lp-modal__close" type="button" data-close aria-label="Kapat">&times;</button>
+        <h3 id="m-erp-title">Satınalma & ERP</h3>
+        <p>Teklif toplama, PO, tedarikçi kıyas, maliyet ve teslimat tarihine göre optimizasyon. ERP ile çift yönlü senkronizasyon.</p>
+        <div class="modal-actions">
+            <a class="btn primary" href="/procurement">Satınalma Paneli</a>
+            <a class="btn ghost" href="/docs/erp">Entegrasyon Notları</a>
+        </div>
+    </div>
+</div>
+
+<div class="lp-modal" id="m-ops" aria-hidden="true">
+    <div class="lp-modal__dialog" role="dialog" aria-modal="true" tabindex="-1">
+        <button class="lp-modal__close" type="button" data-close aria-label="Kapat">&times;</button>
+        <h3>Akıllı Depo Operasyonları</h3>
+        <p>Raf eşleşmesi, iş emri sıraları, sayım ve görev onayları tek akışta. KPI: tamamlama süresi, raf doluluk, sayım doğruluğu.</p>
+    </div>
+</div>
+
+<div class="lp-modal" id="m-plan" aria-hidden="true">
+    <div class="lp-modal__dialog" role="dialog" aria-modal="true" tabindex="-1">
+        <button class="lp-modal__close" type="button" data-close aria-label="Kapat">&times;</button>
+        <h3>Dinamik Dağıtım Planlama</h3>
+        <p>Zaman pencereleri, araç kapasitesi, durak sırası ve gecikme cezasına göre optimizasyon. PoD ile kapanış.</p>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/landing.js" defer asp-append-version="true"></script>
+}

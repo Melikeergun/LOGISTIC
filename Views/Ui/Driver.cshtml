@@ -1,0 +1,30 @@
+﻿@{
+    Layout = "_Layout";
+}
+<section class="card" style="max-width:900px;margin:auto">
+    <h2>Dağıtım Listem</h2>
+    <p class="muted">Bugün teslim/iadeye atanmış gönderileriniz burada listelenir.</p>
+
+    <table id="drvTbl" style="width:100%">
+        <thead><tr><th>Gönderi</th><th>Müşteri</th><th>Adres</th><th>Durum</th><th>İşlem</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</section>
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const r = await fetch('/api/orders/browse?take=10', { credentials:'include' });
+        if (!r.ok) return;
+        const data = await r.json();
+        document.querySelector('#drvTbl tbody').innerHTML = data.map(x => `
+          <tr>
+            <td>${x.orderId}</td>
+            <td>${x.customerId||'-'}</td>
+            <td>(örnek adres)</td>
+            <td>${x.status||'-'}</td>
+            <td><button class="btn" onclick="alert('Teslim alındı (demo)')">Teslim Al</button></td>
+          </tr>
+        `).join('');
+      } catch(e){}
+    });
+</script>

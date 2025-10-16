@@ -1,0 +1,17 @@
+﻿@{
+    Layout = "_Layout";
+}
+@await Html.PartialAsync("_TokenBar")
+<script src="/js/ui.js"></script>
+<script>document.addEventListener('DOMContentLoaded', UI.requireAuth);</script>
+
+<section class="card">
+    <h2>Rol Özeti & Ön Filtre</h2>
+    <p>Aktif Rol: <b id="roleName">—</b></p>
+    <div class="grid">
+        <div><h3>Düzenlenebilir</h3><ul id="editableList"></ul></div>
+        <div><h3>Sadece Okunur</h3><ul id="readonlyList"></ul></div>
+    </div>
+</section>
+<script src="/js/ui.js"></script>
+<script>document.addEventListener('DOMContentLoaded', UI.pageIndex);</script>

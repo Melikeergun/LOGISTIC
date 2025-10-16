@@ -1,0 +1,9 @@
+﻿@{
+    Layout = "_Layout";
+    var ret = ViewBag.ReturnUrl as string ?? "/";
+}
+<section class="card">
+    <h2>Erişim Engellendi (403)</h2>
+    <p>Bu sayfayı görüntüleme yetkiniz yok.</p>
+    <p><a class="btn" href="@ret">Geri dön</a></p>
+</section>

@@ -1,0 +1,13 @@
+{
+  "RackPrefix": "B",
+  "RackAisle": 3,
+  "RackLevel": 7,
+  "TwinRack": "A-01",
+  "TwinSku": "",
+  "TwinAddr": "",
+  "FlowTitle": "",
+  "FlowStatus": "Open",
+  "FlowAssignee": "",
+  "RackList": [],
+  "NextId": 1
+}

@@ -1,0 +1,13 @@
+﻿@{
+    Layout = "_Layout";
+    var ret = (string)ViewBag.ReturnUrl;
+}
+<section class="card" style="max-width:560px;margin:auto">
+    <h2>Çıkış yapılıyor…</h2>
+    <p class="muted">Lütfen bekleyin.</p>
+</section>
+<script>
+    localStorage.removeItem('jwt');
+    localStorage.removeItem('me');
+    setTimeout(()=>location.href='@ret', 300);
+</script>

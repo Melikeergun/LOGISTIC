@@ -1,0 +1,374 @@
+﻿@{
+    Layout = "_Layout";
+    ViewBag.Title = "Operatör Görevleri";
+}
+
+<section class="page-hero">
+    <h1>👷‍♂️ Operatör Görevleri</h1>
+    <p>Toplama, yerleştirme ve sayım görevlerinizi buradan yönetin.</p>
+</section>
+
+<section class="app-container">
+    <article class="card" style="max-width:1100px">
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <!-- Sekmeler -->
+            <div id="tabs" class="btn-group">
+                <button class="btn btn-primary" data-tab="pick">Toplama</button>
+                <button class="btn" data-tab="putaway">Yerleştirme</button>
+                <button class="btn" data-tab="count">Sayım</button>
+            </div>
+
+            <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap">
+                <button id="btnRefresh" class="btn">Yenile</button>
+                <button id="btnDone" class="btn">Seçileni Tamamla</button>
+                <button id="btnLate" class="btn">Gecikme Bildir</button>
+                <button id="btnDelete" class="btn btn-danger" title="Seçili görevi sil">Sil</button>
+            </div>
+        </div>
+
+        <!-- Yeni Görev -->
+        <details class="card soft" style="margin-top:12px">
+            <summary style="cursor:pointer"><b>＋ Yeni Görev</b></summary>
+            <div class="grid" style="margin-top:10px">
+                <div>
+                    <label class="muted">Görev Türü</label>
+                    <select id="ngType">
+                        <option value="pick">Toplama</option>
+                        <option value="putaway">Yerleştirme</option>
+                        <option value="count">Sayım</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="muted">Lokasyon</label>
+                    <input id="ngLoc" placeholder="R1-A-01" />
+                </div>
+                <div>
+                    <label class="muted">SKU</label>
+                    <input id="ngSku" placeholder="SKU-1001 (sayımda boş geçilebilir)" />
+                </div>
+                <div>
+                    <label class="muted">Adet</label>
+                    <input id="ngQty" type="number" min="0" value="1" />
+                </div>
+                <div>
+                    <label class="muted">Durum</label>
+                    <select id="ngStatus">
+                        <option value="Yeni">Yeni</option>
+                        <option value="Atandı">Atandı</option>
+                        <option value="Bekliyor">Bekliyor</option>
+                        <option value="Tamamlandı">Tamamlandı</option>
+                    </select>
+                </div>
+            </div>
+            <footer style="margin-top:10px;display:flex;gap:.5rem">
+                <button id="btnAdd" class="btn btn-primary">Ekle</button>
+                <span class="muted">Veriler tarayıcıda tutulur (localStorage).</span>
+            </footer>
+        </details>
+
+        <!-- Liste -->
+        <div id="listHost" class="table-host" style="margin-top:12px;overflow:auto;max-height:420px">
+            <!-- Render JS -->
+        </div>
+
+        <footer id="ftStats" class="muted" style="margin-top:6px"></footer>
+    </article>
+</section>
+
+<style>
+    .btn-group .btn {
+        border-radius: 10px;
+    }
+
+        .btn-group .btn + .btn {
+            margin-left: .25rem
+        }
+
+    .btn {
+        padding: .55rem .9rem;
+        border: 1px solid #263241;
+        background: #0f1a26;
+        color: #cfe2ff;
+        border-radius: 12px;
+    }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+    .btn-primary {
+        background: #17324a;
+        border-color: #285075;
+        color: #cfe2ff;
+    }
+
+    .btn-danger {
+        background: #3a1620;
+        border-color: #6e2336;
+        color: #ffd6dd;
+    }
+
+    .badge {
+        font-size: .72rem;
+        padding: 2px 6px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+    }
+
+    .b-new {
+        background: #113a2e;
+        border-color: #2aa883;
+        color: #9ff5de;
+    }
+
+    .b-done {
+        background: #233515;
+        border-color: #5aa328;
+        color: #d9ffb6;
+    }
+
+    .b-warn {
+        background: #4a2b12;
+        border-color: #c07a2a;
+        color: #ffdcb3;
+    }
+
+    .b-pick {
+        background: #1f2a3a;
+        border-color: #3b6aa8;
+        color: #b9d8ff;
+    }
+
+    .b-putaway {
+        background: #29223a;
+        border-color: #7b4fd8;
+        color: #e2d8ff;
+    }
+
+    .b-count {
+        background: #30351f;
+        border-color: #9aa83b;
+        color: #f4ffb9;
+    }
+
+    .soft {
+        background: #0b1726;
+        border: 1px dashed #203047;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: .55rem;
+        border-bottom: 1px solid #172235;
+        white-space: nowrap;
+    }
+
+    th {
+        position: sticky;
+        top: 0;
+        background: #0d1b2a;
+        z-index: 1;
+    }
+
+    .muted {
+        color: #89a3bd;
+        font-size: .9rem;
+    }
+
+    .pill {
+        border-radius: 12px;
+        padding: .1rem .4rem;
+        border: 1px solid #22324a;
+        color: #9fb3c8;
+        font-size: .75rem;
+    }
+
+    .row {
+        display: flex;
+        gap: .5rem;
+        align-items: center;
+    }
+
+    input[type="radio"] {
+        transform: translateY(1px);
+    }
+</style>
+
+<script>
+    (function(){
+        const KEY = "mlyso.op_tasks";
+        const $ = s => document.querySelector(s);
+        const $$ = s => document.querySelectorAll(s);
+
+        // State
+        let tab = (new URLSearchParams(location.search).get("tab") || "pick").toLowerCase();
+        let selectedId = null;
+
+        // Seed
+        function seedIfEmpty(){
+            const cur = localStorage.getItem(KEY);
+            if(cur) return;
+            const now = new Date().toISOString();
+            const sample = [
+                { id:"t1", type:"pick",    loc:"R1-A-01", sku:"SKU-1001", qty:5, status:"Yeni",        createdAt:now },
+                { id:"t2", type:"pick",    loc:"R1-A-03", sku:"SKU-1002", qty:2, status:"Tamamlandı", createdAt:now },
+                { id:"t3", type:"putaway", loc:"R2-B-02", sku:"SKU-2100", qty:8, status:"Atandı",     createdAt:now },
+                { id:"t4", type:"count",   loc:"R2-C-01", sku:"",         qty:0, status:"Bekliyor",   createdAt:now }
+            ];
+            localStorage.setItem(KEY, JSON.stringify(sample));
+        }
+
+        function getTasks(){
+            try { return JSON.parse(localStorage.getItem(KEY) || "[]"); }
+            catch { return []; }
+        }
+        function saveTasks(list){ localStorage.setItem(KEY, JSON.stringify(list)); }
+
+        // UI helpers
+        function badge(text, cls){ return `<span class="badge ${cls}">${text}</span>`; }
+        function typeBadge(t){
+            if(t==="pick") return badge("Toplama","b-pick");
+            if(t==="putaway") return badge("Yerleştirme","b-putaway");
+            return badge("Sayım","b-count");
+        }
+        function statusBadge(s){
+            if(s==="Tamamlandı") return badge("Tamamlandı","b-done");
+            if(s==="Yeni") return badge("Yeni","b-new");
+            return badge(s,"b-warn");
+        }
+
+        function setActiveTab(){
+            $$("#tabs .btn").forEach(b=>{
+                b.classList.toggle("btn-primary", b.dataset.tab===tab);
+            });
+        }
+
+        function render(){
+            setActiveTab();
+            const all = getTasks();
+            const list = all.filter(x=>x.type===tab);
+
+            // Stats
+            const sPick = all.filter(x=>x.type==="pick").length;
+            const sPut  = all.filter(x=>x.type==="putaway").length;
+            const sCnt  = all.filter(x=>x.type==="count").length;
+            $("#ftStats").innerHTML = `Toplama: ${sPick} • Yerleştirme: ${sPut} • Sayım: ${sCnt} • Toplam: ${all.length}`;
+
+            // Table
+            let html = `<table><thead>
+                <tr>
+                    <th style="width:42px;"></th>
+                    <th>Görev</th><th>Lokasyon</th><th>SKU</th>
+                    <th>Adet</th><th>Durum</th>
+                </tr></thead><tbody>`;
+
+            if(list.length===0){
+                html += `<tr><td colspan="6" class="muted">Bu sekmede görev yok.</td></tr>`;
+            } else {
+                list.forEach(x=>{
+                    const sel = selectedId===x.id ? "checked" : "";
+                    html += `<tr>
+                        <td><input type="radio" name="sel" ${sel} value="${x.id}" /></td>
+                        <td>${typeBadge(x.type)}</td>
+                        <td>${x.loc || "-"}</td>
+                        <td>${x.sku || "-"}</td>
+                        <td>${x.qty}</td>
+                        <td>${statusBadge(x.status)}</td>
+                    </tr>`;
+                });
+            }
+            html += `</tbody></table>`;
+            $("#listHost").innerHTML = html;
+
+            // radio select hook
+            $$("#listHost input[type=radio]").forEach(r=>{
+                r.addEventListener("change", e=> selectedId = e.target.value);
+            });
+        }
+
+        // Actions
+        function addNewTask(){
+            const type = $("#ngType").value;
+            const loc  = ($("#ngLoc").value || "").trim();
+            const sku  = ($("#ngSku").value || "").trim();
+            const qty  = Math.max(0, parseInt($("#ngQty").value || "0", 10));
+            const st   = $("#ngStatus").value;
+
+            if(!loc){ alert("Lokasyon zorunludur."); return; }
+            if(type!=="count" && !sku){ alert("Toplama/Yerleştirme için SKU zorunludur."); return; }
+
+            const list = getTasks();
+            const t = {
+                id: "t" + Date.now(),
+                type, loc, sku, qty,
+                status: st,
+                createdAt: new Date().toISOString()
+            };
+            list.unshift(t);
+            saveTasks(list);
+            if(type!==tab){ tab = type; history.replaceState(null,"",`?tab=${tab}`); }
+            selectedId = t.id;
+            render();
+
+            // temizle
+            $("#ngLoc").value = "";
+            $("#ngSku").value = "";
+            $("#ngQty").value = "1";
+            $("#ngStatus").value = "Yeni";
+        }
+
+        function markDone(){
+            if(!selectedId){ alert("Önce bir görev seçin."); return; }
+            const list = getTasks();
+            const it = list.find(x=>x.id===selectedId);
+            if(!it) return;
+            it.status = "Tamamlandı";
+            saveTasks(list);
+            render();
+        }
+
+        function markLate(){
+            if(!selectedId){ alert("Önce bir görev seçin."); return; }
+            const list = getTasks();
+            const it = list.find(x=>x.id===selectedId);
+            if(!it) return;
+            it.status = "Gecikme";
+            saveTasks(list);
+            render();
+        }
+
+        function removeSelected(){
+            if(!selectedId){ alert("Önce bir görev seçin."); return; }
+            const list = getTasks().filter(x=>x.id!==selectedId);
+            saveTasks(list);
+            selectedId = null;
+            render();
+        }
+
+        // Events
+        $("#btnAdd").addEventListener("click", addNewTask);
+        $("#btnRefresh").addEventListener("click", render);
+        $("#btnDone").addEventListener("click", markDone);
+        $("#btnLate").addEventListener("click", markLate);
+        $("#btnDelete").addEventListener("click", removeSelected);
+
+        $$("#tabs .btn").forEach(b=>{
+            b.addEventListener("click", ()=>{
+                tab = b.dataset.tab;
+                history.replaceState(null,"",`?tab=${tab}`);
+                render();
+            });
+        });
+
+        // bootstrap
+        seedIfEmpty();
+        // initial tab (URL?tab=)
+        if(tab!=="pick" && tab!=="putaway" && tab!=="count") tab = "pick";
+        setActiveTab();
+        render();
+    })();
+</script>

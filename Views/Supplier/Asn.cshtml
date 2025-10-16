@@ -1,0 +1,50 @@
+﻿@using MLYSO.Web.Models
+@{
+    Layout = "_Layout";
+}
+<section class="card">
+    <h2>Tedarikçi – ASN/Randevu</h2>
+    <div class="grid" style="grid-template-columns: repeat(5,minmax(0,1fr)); gap:8px">
+        <input id="slot" type="datetime-local" />
+        <input id="sku" placeholder="SKU" />
+        <input id="qty" type="number" value="1" />
+        <select id="st"><option>Planned</option><option>Confirmed</option></select>
+        <button onclick="add()">ASN Oluştur</button>
+    </div>
+    <table id="tbl" style="width:100%; margin-top:10px">
+        <thead><tr><th>No</th><th>Randevu</th><th>SKU</th><th>Adet</th><th>Durum</th><th>İşlem</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</section>
+<script>
+    async function load(){
+      const r = await fetch('/api/supplier/asn',{credentials:'include'}); const items = await r.json();
+      tbl.querySelector('tbody').innerHTML = (items||[]).map(x=>`
+        <tr>
+          <td>${x.id}</td>
+          <td contenteditable onblur="upd(${x.id}, this.innerText, null, null, null)">${x.slot?.replace('T',' ').substring(0,16)}</td>
+          <td contenteditable onblur="upd(${x.id}, null, this.innerText, null, null)">${x.sku}</td>
+          <td contenteditable onblur="upd(${x.id}, null, null, this.innerText, null)">${x.qty}</td>
+          <td>
+            <select onchange="upd(${x.id}, null, null, null, this.value)">
+              ${['Planned','Confirmed'].map(s=>`<option ${s===x.status?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </td>
+          <td><button onclick="upd(${x.id}, prompt('Slot (yyyy-MM-dd HH:mm)', (x.slot||'').replace('T',' ').substring(0,16)), prompt('SKU', x.sku), prompt('Qty', x.qty), prompt('Durum', x.status))">Güncelle</button></td>
+        </tr>`).join('');
+    }
+    async function add(){
+      const dto = { slot:new Date(slot.value).toISOString(), sku:sku.value, qty:+qty.value, status:st.value };
+      await fetch('/api/supplier/asn',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(dto)});
+      load();
+    }
+    async function upd(id, slot, sku, qty, status){
+      const dto={};
+      if(slot) dto.slot = new Date(slot.replace(' ','T')).toISOString();
+      if(sku) dto.sku = sku;
+      if(qty!==null && qty!==undefined && qty!=='') dto.qty = +qty;
+      if(status) dto.status = status;
+      await fetch('/api/supplier/asn/'+id,{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(dto)});
+    }
+    document.addEventListener('DOMContentLoaded', load);
+</script>

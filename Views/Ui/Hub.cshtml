@@ -1,0 +1,182 @@
+﻿@using System.Security.Claims
+@using MLYSO.Web.Models
+@{
+    Layout = "_Layout";
+    ViewBag.Title = "Rol Merkezi";
+    var role = (ViewBag.Role as string ?? "").ToLowerInvariant();
+
+    bool isAdmin = User.IsInRole(Roles.Admin);
+    bool isOps = isAdmin || User.IsInRole(Roles.Operations) || User.IsInRole(Roles.Planning) || User.IsInRole(Roles.Logistics);
+    bool isWhMgr = isAdmin || User.IsInRole(Roles.WarehouseManager) || User.IsInRole(Roles.WarehouseChief);
+    bool isWhOp = isAdmin || User.IsInRole(Roles.WarehouseOperator);
+    bool isDrv = isAdmin || User.IsInRole(Roles.Driver);
+    bool isErp = isAdmin || User.IsInRole(Roles.Purchasing);
+    bool isCrm = isAdmin || User.IsInRole(Roles.CrmAgent) || User.IsInRole(Roles.CustomerService);
+    bool isSup = isAdmin || User.IsInRole(Roles.Supplier);
+    bool isCust = isAdmin || User.IsInRole(Roles.Customer);
+
+    var cards = new List<(string t, string d, string href, string img, string badge)>();
+    if (isOps)
+    {
+        cards.Add(("Sevkiyat Planı", "Pencere, kapasite ve kısıtlarla planlama",
+         "/shipments", "/img/hub/ops_plan.jpg", "Planlama"));
+
+        cards.Add(("Tahminler", "Talep kestirimleri ve senaryolar",
+            "/forecasts", "/img/hub/ops_forecast.jpg", "Forecast"));
+
+        cards.Add(("Rotalar", "Duraklar, süre ve maliyet optimizasyonu",
+            "/routes", "/img/hub/ops_routes.jpg", "Rota"));
+    }
+    if (isWhMgr)
+    {
+        cards.Add(("Raflar", "Raf/slot yönetimi", "/ui/warehouse?tab=racks", "/img/hub/wh_racks.jpg", "WMS"));
+
+        cards.Add(("Dijital İkiz", "Adres–envanter eşleşmesi", "/twin", "/img/hub/wh_twin.jpg", "Twin"));
+
+        cards.Add(("İş Emirleri", "WO akışı ve onaylar", "/ui/warehouse?tab=workorders", "/img/hub/wh_workorders.jpg", "WO"));
+    }
+    if (isWhOp)
+    {
+        cards.Add(("Toplama", "Pick görevleri", "/ui/tasks?tab=pick", "/img/hub/op_pick.jpg", "Operatör"));
+        cards.Add(("Yerleştirme", "Putaway görevleri", "/ui/tasks?tab=putaway", "/img/hub/op_putaway.jpg", "Operatör"));
+        cards.Add(("Sayım", "Cycle count", "/ui/tasks?tab=count", "/img/hub/op_count.jpg", "Operatör"));
+    }
+    if (isDrv)
+    {
+        cards.Add(("Dağıtım Listesi", "Günlük duraklar", "/ui/driver", "/img/hub/drv_list.jpg", "Sürücü"));
+        cards.Add(("Teslim (PoD)", "E-imza ve foto kanıt", "/ui/driver?tab=pod", "/img/hub/drv_pod.jpg", "PoD"));
+        cards.Add(("İade", "İade onayı/teslimi", "/ui/driver?tab=returns", "/img/hub/drv_return.jpg", "İade"));
+    }
+    if (isErp)
+    {
+        cards.Add(("Teklifler", "RFQ/Quote süreci", "/ui/erp-purchase?tab=quotes", "/img/hub/erp_quote.jpg", "ERP"));
+        cards.Add(("Faturalar", "AP/AR yönetimi", "/ui/erp-purchase?tab=invoices", "/img/hub/erp_invoice.jpg", "ERP"));
+        cards.Add(("Tedarik Yönetimi", "Satıcı ve sözleşmeler", "/ui/erp-purchase", "/img/hub/erp_supplier.jpg", "ERP"));
+    }
+    if (isCrm)
+    {
+        cards.Add(("Müşteri Kayıtları", "CRM kayıtları", "/ui/crm-risk?tab=customers", "/img/hub/crm_customers.jpg", "CRM"));
+        cards.Add(("Bildirimler", "Uyarılar/bildirimler", "/ui/crm-risk?tab=alerts", "/img/hub/crm_alerts.jpg", "CRM"));
+        cards.Add(("İade Süreci", "Müşteri iade akışı", "/ui/crm-risk?tab=returns", "/img/hub/crm_returns.jpg", "CRM"));
+    }
+    if (isSup)
+    {
+        cards.Add(("ASN", "İleri bildirim (ASN)", "/ui/supplier-asn", "/img/hub/supplier_asn.jpg", "Tedarikçi"));
+    }
+    if (isCust)
+    {
+        cards.Add(("Siparişlerim", "Açık siparişler", "/customer/orders", "/img/hub/cust_orders.jpg", "Müşteri"));
+        cards.Add(("Teslimatlarım", "Teslim onayları", "/customer/orders?tab=delivered", "/img/hub/cust_deliveries.jpg", "Müşteri"));
+        cards.Add(("İade Takibi", "İade talepleri", "/customer/returns", "/img/hub/cust_returns.jpg", "Müşteri"));
+    }
+}
+<section class="page-hero">
+    <h1>🎯 Rol Merkezi</h1>
+    <p>Aktif rolünüz: <b>@(ViewBag.Role ?? "—")</b>. Aşağıdaki özelliklerden birini seçin.</p>
+</section>
+
+<section class="app-container hub-grid">
+    @foreach (var c in cards)
+    {
+        <a class="hub-card" href="@c.href">
+            <img src="@c.img" alt="@c.t" loading="lazy" />
+            <div class="hub-overlay"></div>
+            <div class="hub-body">
+                <span class="hub-badge">@c.badge</span>
+                <h3>@c.t</h3>
+                <p>@c.d</p>
+            </div>
+        </a>
+    }
+
+    @if (!cards.Any())
+    {
+        <div class="card">
+            <h3>Bu rol için tanımlı özellik bulunamadı.</h3>
+            <p class="muted">Lütfen bir rol seçin veya yöneticinize başvurun.</p>
+            <a class="btn" href="/roles/choose">Rol Değiştir</a>
+        </div>
+    }
+</section>
+
+@section Styles {
+    <style>
+        .hub-grid {
+            display: grid;
+            grid-template-columns: repeat(3,minmax(0,1fr));
+            gap: 16px
+        }
+        @@media (max-width:1080px) {
+            .hub-grid
+
+        {
+            grid-template-columns: 1fr 1fr
+        }
+
+        }
+        @@media (max-width:680px) {
+            .hub-grid
+
+        {
+            grid-template-columns: 1fr
+        }
+
+        }
+
+        .hub-card {
+            position: relative;
+            display: block;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid #14263b;
+            background: #0b1726;
+            box-shadow: 0 10px 30px rgba(0,0,0,.35);
+            min-height: 240px
+        }
+
+            .hub-card img {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                filter: saturate(1.05) brightness(.8)
+            }
+
+        .hub-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top,rgba(8,19,32,.9),rgba(8,19,32,.25))
+        }
+
+        .hub-body {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 14px
+        }
+
+        .hub-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #113a2e;
+            border: 1px solid #1fbf8f;
+            color: #9ff5de;
+            font-size: 12px
+        }
+
+        .hub-body h3 {
+            margin: 8px 0 4px
+        }
+
+        .hub-body p {
+            margin: 0;
+            color: #9fb3c8
+        }
+
+        .hub-card:hover {
+            transform: translateY(-2px)
+        }
+    </style>
+}

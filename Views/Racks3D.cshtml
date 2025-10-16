@@ -1,0 +1,210 @@
+﻿@model MLYSO.Web.Controllers.RacksController.RackSceneVm
+@{
+    Layout = "_Layout";
+}
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/%40picocss/pico%402/css/pico.min.css" />
+
+<section class="container">
+    <h2>Raflandırma (3D • statik demo)</h2>
+    <p class="muted">
+        <small>
+            Depo: @Model.WarehouseL x @Model.WarehouseW x @Model.WarehouseH mm –
+            Raf sayısı: @Model.Racks.Count
+        </small>
+    </p>
+
+    <article>
+        <header>Görünüm</header>
+        <div id="wh3d" style="height:520px;border:1px solid var(--muted-border-color);border-radius:12px;"></div>
+        <footer>
+            <small>
+                <span style="display:inline-block;width:12px;height:12px;background:#57d69a;border-radius:3px;margin-right:6px;"></span>Dolu
+                &nbsp;&nbsp;
+                <span style="display:inline-block;width:12px;height:12px;background:#2c3440;border-radius:3px;margin-right:6px;border:1px solid #3b4c5e;"></span>Boş
+                &nbsp;&nbsp;| Orbit: sürükle/zoom, Reset: çift tık
+            </small>
+        </footer>
+    </article>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+    (() => {
+      const host = document.getElementById('wh3d');
+
+      // Ölçek (mm -> sahne birimi)
+      const SCALE = 0.01;            // 1 birim = 10 mm
+      const S = v => v * SCALE;
+
+      const scene = new THREE.Scene();
+      const width  = host.clientWidth || 900;
+      const height = host.clientHeight || 520;
+      const cam = new THREE.PerspectiveCamera(55, width/height, 0.1, 100000);
+      const renderer = new THREE.WebGLRenderer({antialias:true});
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.setClearColor(0x0b0f14);
+      host.appendChild(renderer.domElement);
+
+      // Işıklar
+      scene.add(new THREE.AmbientLight(0xffffff, .9));
+      const dl = new THREE.DirectionalLight(0xffffff, .6); dl.position.set(2,-1,3); scene.add(dl);
+
+      // Zemin + duvar teli (depo sınırı)
+      const whL = @Model.WarehouseL, whW = @Model.WarehouseW, whH = @Model.WarehouseH;
+      {
+        const grid = new THREE.GridHelper(S(whL), 24, 0x2a3646, 0x1b2430);
+        grid.rotation.x = Math.PI/2;
+        grid.position.set(0,0,0);
+        scene.add(grid);
+
+        const boxGeo = new THREE.BoxGeometry(S(whL), S(whW), S(whH));
+        const wf = new THREE.WireframeGeometry(boxGeo);
+        const walls = new THREE.LineSegments(wf, new THREE.LineBasicMaterial({color:0x2e3947, transparent:true, opacity:0.35}));
+        walls.position.set(S(whL/2), S(whW/2), S(whH/2));
+        scene.add(walls);
+      }
+
+      // Kamera
+      const diag = Math.sqrt(whL*whL + whW*whW + whH*whH);
+      cam.position.set(S(whL*0.35), S(-whW*0.7), S(whH*0.7));
+      cam.lookAt(S(whL*0.5), S(whW*0.5), S(whH*0.4));
+
+      // Orbit
+      let controls;
+      if (typeof THREE.OrbitControls === 'function'){
+        controls = new THREE.OrbitControls(cam, renderer.domElement);
+        controls.target.set(S(whL*0.5), S(whW*0.5), S(whH*0.3));
+        controls.enableDamping = true;
+        controls.update();
+
+        // çift tık reset
+        renderer.domElement.addEventListener('dblclick', () => {
+          cam.position.set(S(whL*0.35), S(-whW*0.7), S(whH*0.7));
+          controls.target.set(S(whL*0.5), S(whW*0.5), S(whH*0.3));
+          controls.update();
+        });
+      }
+
+      // Raf çizimi
+      const racks = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Racks));
+      const gap = 30; // mm görsel boşluk (palet etrafı)
+      const G = v => S(Math.max(0, v - gap)); // paletleri biraz içeriden çiz
+
+      function drawRack(r){
+        const group = new THREE.Group();
+        scene.add(group);
+
+        // Boyutlar
+        const L = r.Bays * r.BayWidth;
+        const W = r.Depth;
+        const H = r.Levels * r.LevelHeight;
+
+        // Tel kafes iskelet (dikey kolonlar + kat hatları)
+        const frame = new THREE.Group();
+        group.add(frame);
+
+        const matWire = new THREE.LineBasicMaterial({color:0xffffff, transparent:true, opacity:0.9});
+        const verts = [];
+        const addLine = (x1,y1,z1,x2,y2,z2) => {
+          verts.push(new THREE.Vector3(S(x1),S(y1),S(z1)));
+          verts.push(new THREE.Vector3(S(x2),S(y2),S(z2)));
+        };
+
+        // köşe kolonlar
+        const corners = [
+          [0,0,0], [L,0,0], [0,W,0], [L,W,0]
+        ];
+        corners.forEach(([cx,cy,cz])=>{
+          addLine(cx,cy,cz, cx,cy,H);
+        });
+
+        // üst çevre
+        addLine(0,0,H, L,0,H);
+        addLine(0,W,H, L,W,H);
+        addLine(0,0,H, 0,W,H);
+        addLine(L,0,H, L,W,H);
+
+        // kat çizgileri
+        for(let lv=1; lv<r.Levels; lv++){
+          const z = lv * r.LevelHeight;
+          addLine(0,0,z, L,0,z); addLine(0,W,z, L,W,z);
+          addLine(0,0,z, 0,W,z); addLine(L,0,z, L,W,z);
+        }
+
+        const geom = new THREE.BufferGeometry().setFromPoints(verts);
+        const lines = new THREE.LineSegments(geom, matWire);
+        frame.add(lines);
+
+        // Palet/slot küpleri – slot matrisi [level, bay]
+        // Renk: dolu => #57d69a, boş => koyu gri
+        const matFull = new THREE.MeshPhongMaterial({color:0x57d69a, opacity:0.95, transparent:true});
+        const matEmpty = new THREE.MeshPhongMaterial({color:0x2c3440, opacity:0.65, transparent:true});
+
+        for(let lv=0; lv<r.Levels; lv++){
+          for(let bx=0; bx<r.Bays; bx++){
+            const idx = lv*r.Bays + bx;
+            const full = r.Fill && r.Fill[idx];
+
+            const w = G(r.BayWidth);
+            const d = G(r.Depth);
+            const h = G(r.LevelHeight) * 0.85; // palet yüksekliğini biraz düşük göster
+            const cube = new THREE.Mesh(new THREE.BoxGeometry(S(w), S(d), S(h)), full ? matFull : matEmpty);
+
+            const cx = r.X + (bx*r.BayWidth) + r.BayWidth/2;
+            const cy = r.Y + r.Depth/2;
+            const cz = r.Z + (lv*r.LevelHeight) + h/2 + S(gap)*0; // z merkez
+
+            cube.position.set(S(cx), S(cy), S(cz));
+            group.add(cube);
+          }
+        }
+
+        // grubu r.X/Y/Z konumuna değil; zaten world mm’den poz verdik.
+        // Etiket
+        const sprite = makeTextSprite(r.Code);
+        sprite.position.set(S(r.X + L/2), S(r.Y - 400), S(r.Z + H + 300));
+        scene.add(sprite);
+      }
+
+      // Basit text sprite (raf kodu)
+      function makeTextSprite(message) {
+        const fontSize = 64, padding = 12;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 512; canvas.height = 128;
+        ctx.fillStyle = 'rgba(11,15,20,0.8)';
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+        ctx.font = `bold ${fontSize}px system-ui`;
+        ctx.fillStyle = '#ffffff';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(message, padding, canvas.height/2);
+        const tex = new THREE.CanvasTexture(canvas);
+        const mat = new THREE.SpriteMaterial({map: tex, transparent:true});
+        const spr = new THREE.Sprite(mat);
+        spr.scale.set( S(1800), S(460), 1 );
+        return spr;
+      }
+
+      racks.forEach(drawRack);
+
+      // Render
+      function animate(){
+        requestAnimationFrame(animate);
+        controls?.update();
+        renderer.render(scene, cam);
+      }
+      animate();
+
+      // Responsive
+      window.addEventListener('resize', () => {
+        const w = host.clientWidth || 900;
+        const h = host.clientHeight || 520;
+        cam.aspect = w/h; cam.updateProjectionMatrix();
+        renderer.setSize(w,h);
+        controls?.update();
+      }, {passive:true});
+    })();
+</script>

@@ -1,0 +1,253 @@
+﻿@{
+    Layout = "_Layout";
+    ViewBag.Title = "Sevkiyat Planı (Demo)";
+}
+
+<section class="card">
+    <h2>Sevkiyat Planı (Demo)</h2>
+    <p class="muted">Bu ekran şimdilik statik/ geçici verilerle çalışır. Formdan eklediklerin tarayıcı <b>localStorage</b>’a yazılır; sayfayı yenileyince kalır.</p>
+
+    <div class="grid4">
+        <div class="kpi">
+            <div class="kpi-title">Toplam Sevkiyat</div>
+            <div id="kpiTotal" class="kpi-value">0</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-title">Planlanan</div>
+            <div id="kpiPlanned" class="kpi-value">0</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-title">Yolda</div>
+            <div id="kpiDispatched" class="kpi-value">0</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-title">Teslim</div>
+            <div id="kpiDelivered" class="kpi-value">0</div>
+        </div>
+    </div>
+
+    <div class="grid2" style="margin-top:16px">
+        <div class="card">
+            <h3>Duruma Göre Dağılım</h3>
+            <canvas id="pieStatus" height="220"></canvas>
+        </div>
+        <div class="card">
+            <h3>Günlük Sevkiyat (son 7 gün)</h3>
+            <canvas id="lineDaily" height="220"></canvas>
+        </div>
+    </div>
+
+    <hr />
+
+    <details>
+        <summary><b>Yeni Sevkiyat Ekle</b></summary>
+        <div class="form-row">
+            <label>No</label><input id="fNo" placeholder="SHP-20250903-001" />
+        </div>
+        <div class="form-row">
+            <label>Plaka</label><input id="fPlate" placeholder="34 ABC 123" />
+        </div>
+        <div class="form-row">
+            <label>Durum</label>
+            <select id="fStatus">
+                <option>Planned</option>
+                <option>Dispatched</option>
+                <option>Delivered</option>
+                <option>Cancelled</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>Tarih</label><input id="fDate" type="date" />
+        </div>
+        <button class="btn" id="btnAdd">Ekle</button>
+        <span id="msg" class="muted" style="margin-left:8px"></span>
+    </details>
+
+    <div style="margin-top:16px; overflow:auto">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Plaka</th>
+                    <th>Durum</th>
+                    <th>Tarih</th>
+                    <th style="width:1px">Sil</th>
+                </tr>
+            </thead>
+            <tbody id="grid"></tbody>
+        </table>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // --- Demo veri (ilk kurulumda)
+        const seed = [
+          { no:"SHP-20250901-001", plate:"34 ABC 123", status:"Planned",    date:"2025-09-01" },
+          { no:"SHP-20250901-002", plate:"34 XYZ 987", status:"Dispatched", date:"2025-09-01" },
+          { no:"SHP-20250901-003", plate:"34 DEF 456", status:"Delivered",  date:"2025-09-01" },
+          { no:"SHP-20250902-001", plate:"34 JKL 321", status:"Delivered",  date:"2025-09-02" },
+          { no:"SHP-20250902-002", plate:"34 ABC 123", status:"Dispatched", date:"2025-09-02" },
+          { no:"SHP-20250903-001", plate:"34 QWE 111", status:"Planned",    date:"2025-09-03" },
+          { no:"SHP-20250903-002", plate:"34 XYZ 987", status:"Dispatched", date:"2025-09-03" },
+          { no:"SHP-20250903-003", plate:"34 MNO 654", status:"Cancelled",  date:"2025-09-03" },
+          { no:"SHP-20250904-001", plate:"34 ABC 123", status:"Delivered",  date:"2025-09-04" },
+          { no:"SHP-20250905-001", plate:"34 DEF 456", status:"Delivered",  date:"2025-09-05" },
+          { no:"SHP-20250906-001", plate:"34 XYZ 987", status:"Dispatched", date:"2025-09-06" },
+          { no:"SHP-20250907-001", plate:"34 QWE 111", status:"Planned",    date:"2025-09-07" }
+        ];
+
+        const LS_KEY = "demo.shipments";
+        function loadData(){
+            const raw = localStorage.getItem(LS_KEY);
+            if (!raw) { localStorage.setItem(LS_KEY, JSON.stringify(seed)); return seed.slice(); }
+            try { return JSON.parse(raw); } catch { return seed.slice(); }
+        }
+        function saveData(list){ localStorage.setItem(LS_KEY, JSON.stringify(list)); }
+
+        const grid = document.getElementById('grid');
+        const msg  = document.getElementById('msg');
+        const kpiTotal = document.getElementById('kpiTotal');
+        const kpiPlanned = document.getElementById('kpiPlanned');
+        const kpiDispatched = document.getElementById('kpiDispatched');
+        const kpiDelivered = document.getElementById('kpiDelivered');
+
+        let data = loadData();
+        let pie, line;
+
+        function render(){
+            // tablo
+            grid.innerHTML = data.map((x,i)=>`
+                <tr>
+                  <td>${x.no}</td>
+                  <td>${x.plate}</td>
+                  <td>${x.status}</td>
+                  <td>${x.date}</td>
+                  <td><button class="btn ghost" onclick="delRow(${i})">×</button></td>
+                </tr>`).join('');
+
+            // KPI
+            kpiTotal.textContent = data.length;
+            kpiPlanned.textContent = data.filter(x=>x.status==="Planned").length;
+            kpiDispatched.textContent = data.filter(x=>x.status==="Dispatched").length;
+            kpiDelivered.textContent = data.filter(x=>x.status==="Delivered").length;
+
+            // Durum pie
+            const byStatus = ["Planned","Dispatched","Delivered","Cancelled"].map(s=>data.filter(x=>x.status===s).length);
+            const pieCfg = {
+                type:"pie",
+                data:{ labels:["Planned","Dispatched","Delivered","Cancelled"], datasets:[{ data: byStatus }]},
+                options:{ responsive:true, plugins:{ legend:{ position:"bottom" } } }
+            };
+            if (pie) { pie.destroy(); }
+            pie = new Chart(document.getElementById('pieStatus'), pieCfg);
+
+            // Son 7 gün line
+            const days = [...Array(7)].map((_,i)=>{
+                const d = new Date(); d.setDate(d.getDate()- (6-i));
+                return d.toISOString().slice(0,10);
+            });
+            const daily = days.map(d => data.filter(x=>x.date===d).length);
+            const lineCfg = {
+                type:"line",
+                data:{ labels: days, datasets:[{ label:"Adet", data: daily, tension:.3, fill:false }]},
+                options:{ responsive:true, plugins:{ legend:{ display:false } } }
+            };
+            if (line) { line.destroy(); }
+            line = new Chart(document.getElementById('lineDaily'), lineCfg);
+        }
+
+        window.delRow = function(i){
+            data.splice(i,1);
+            saveData(data);
+            render();
+        }
+
+        document.getElementById('btnAdd').onclick = () => {
+            const no = document.getElementById('fNo').value.trim();
+            const plate = document.getElementById('fPlate').value.trim();
+            const status = document.getElementById('fStatus').value;
+            const date = document.getElementById('fDate').value || new Date().toISOString().slice(0,10);
+            if (!no || !plate){ msg.textContent="No ve Plaka zorunlu"; return; }
+            data.push({ no, plate, status, date });
+            saveData(data);
+            msg.textContent="Eklendi.";
+            render();
+            setTimeout(()=>msg.textContent="", 1500);
+        };
+
+        render();
+    </script>
+    <style>
+        .grid4 {
+            display: grid;
+            grid-template-columns: repeat(4,1fr);
+            gap: 10px
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px
+        }
+
+        .kpi {
+            background: #0f1625;
+            padding: 12px;
+            border-radius: 10px
+        }
+
+        .kpi-title {
+            font-size: .9rem;
+            color: #85a;
+            margin-bottom: 6px
+        }
+
+        .kpi-value {
+            font-size: 1.6rem
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse
+        }
+
+            .table th, .table td {
+                border-bottom: 1px solid #223;
+                padding: 8px
+            }
+
+        .form-row {
+            margin: 6px 0;
+            display: flex;
+            gap: 8px;
+            align-items: center
+        }
+
+            .form-row label {
+                width: 120px
+            }
+
+        .btn {
+            padding: 6px 10px;
+            border-radius: 8px
+        }
+
+            .btn.ghost {
+                background: transparent;
+                border: 1px solid #345;
+                color: #aaa
+            }
+
+        .card {
+            background: #0b1220;
+            border-radius: 12px;
+            padding: 14px
+        }
+
+        .muted {
+            color: #8a8fa3
+        }
+    </style>
+}

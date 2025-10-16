@@ -1,0 +1,205 @@
+﻿@using MLYSO.Web.Models
+@{
+    Layout = "_Layout";
+    var isAdmin = User.IsInRole(Roles.Admin);
+    var isOps = isAdmin || User.IsInRole(Roles.Operations) || User.IsInRole(Roles.Planning) || User.IsInRole(Roles.Logistics);
+}
+
+<section class="card">
+    <div class="flex" style="align-items:center; justify-content:space-between; gap:8px">
+        <h2>Siparişler</h2>
+        <div class="grid" style="grid-template-columns: repeat(6,minmax(0,1fr)); gap:6px; min-width:740px">
+            <input id="fQ" placeholder="Ara (sipariş no / müşteri / SKU)" />
+            <select id="fStatus">
+                <option value="">Durum (hepsi)</option>
+                <option>created</option>
+                <option>approved</option>
+                <option>invoiced</option>
+                <option>shipped</option>
+                <option>delivered</option>
+                <option>canceled</option>
+                <option>returned</option>
+            </select>
+            <input id="fFrom" type="date" />
+            <input id="fTo" type="date" />
+            <select id="fTake">
+                <option value="50">50</option>
+                <option value="100" selected>100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+            </select>
+            <div class="flex" style="gap:6px">
+                <button id="btnReload">Yükle</button>
+                <button id="btnCsv" class="ghost">CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="msg" class="muted" style="margin-top:6px"></div>
+
+    <table id="tbl" style="width:100%; margin-top:8px">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Tarih</th>
+                <th>Müşteri</th>
+                <th>SKU</th>
+                <th>Adet</th>
+                <th>Tutar</th>
+                <th>Durum</th>
+                @if (isOps)
+                {
+                    <th>İşlem</th>
+                }
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <div class="flex" style="justify-content:space-between; align-items:center; margin-top:10px">
+        <div id="info" class="muted"></div>
+        <div class="flex" style="gap:6px">
+            <button id="prev">Önceki</button>
+            <button id="next">Sonraki</button>
+        </div>
+    </div>
+</section>
+
+<script>
+    (() => {
+      const $ = (s) => document.querySelector(s);
+      const $tbody = () => $('#tbl').querySelector('tbody');
+
+      const state = {
+        all: [],
+        page: 0,
+        pageSize: 50
+      };
+
+      const badge = (s) => {
+        const map = {
+          created:'badge',
+          approved:'badge',
+          invoiced:'badge',
+          shipped:'badge warn',
+          delivered:'badge ok',
+          canceled:'badge danger',
+          returned:'badge danger'
+        };
+        return `<span class="${map[s] || 'badge'}">${s || '-'}</span>`;
+      };
+
+      // CSV indir
+      function toCsv(rows) {
+        if (!rows.length) return '';
+        const headers = Object.keys(rows[0]);
+        const esc = (v) => `"${String(v ?? '').replace(/"/g,'""')}"`;
+        const head = headers.map(esc).join(',');
+        const body = rows.map(r => headers.map(h => esc(r[h])).join(',')).join('\n');
+        return head + '\n' + body;
+      }
+      function download(name, text) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8;' }));
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+
+      function rowHtml(x, canAct) {
+        return `
+          <tr>
+            <td>${x.orderId ?? x.id ?? '-'}</td>
+            <td>${(x.orderDate || x.date || '').toString().replace('T',' ').substring(0,16)}</td>
+            <td>${x.customerName || x.customer || '-'}</td>
+            <td>${x.sku || '-'}</td>
+            <td>${x.quantity ?? x.qty ?? 0}</td>
+            <td>${(x.amount ?? x.total ?? 0).toLocaleString('tr-TR')} ₺</td>
+            <td>${badge((x.status || '').toLowerCase())}</td>
+            ${canAct ? `<td><button class="ghost" onclick="details('${x.orderId ?? x.id}')">Detay</button></td>` : ''}
+          </tr>`;
+      }
+
+      function filterLocal(list) {
+        const q = $('#fQ').value.trim().toLowerCase();
+        const st = $('#fStatus').value;
+        const from = $('#fFrom').value ? new Date($('#fFrom').value) : null;
+        const to   = $('#fTo').value ? new Date($('#fTo').value) : null;
+
+        return list.filter(x => {
+          const txt = `${x.orderId ?? ''} ${x.customerName ?? ''} ${x.sku ?? ''}`.toLowerCase();
+          const okQ = q ? txt.includes(q) : true;
+          const okS = st ? (String(x.status||'').toLowerCase() === st.toLowerCase()) : true;
+
+          const dtStr = x.orderDate || x.date;
+          const dt = dtStr ? new Date(dtStr) : null;
+          const okFrom = from ? (dt ? dt >= from : false) : true;
+          const okTo   = to ? (dt ? dt <= new Date(to.getTime()+24*3600*1000-1) : false) : true;
+
+          return okQ && okS && okFrom && okTo;
+        });
+      }
+
+      function render() {
+        const canAct = @((isOps).ToString().ToLower());
+        const take = Number($('#fTake').value || 100);
+        state.pageSize = take;
+
+        const filtered = filterLocal(state.all);
+        const start = state.page * state.pageSize;
+        const pageItems = filtered.slice(start, start + state.pageSize);
+
+        $tbody().innerHTML = pageItems.map(r => rowHtml(r, canAct)).join('');
+        $('#info').textContent = `Toplam: ${filtered.length} • Sayfa: ${state.page+1}/${Math.max(1, Math.ceil(filtered.length/state.pageSize))}`;
+
+        // buton durumları
+        $('#prev').disabled = state.page <= 0;
+        $('#next').disabled = start + state.pageSize >= filtered.length;
+      }
+
+      async function load() {
+        $('#msg').textContent = 'Yükleniyor...';
+        try {
+          const take = Number($('#fTake').value || 100);
+          // API destekliyorsa parametreleri kullan (opsiyonel)
+          const r = await fetch(`/api/orders?take=${take}`, { credentials:'include' });
+          let js = [];
+          if (r.ok) {
+            const data = await r.json();
+            // bazı endpointler {items:[...]} döndürüyor olabilir:
+            js = Array.isArray(data) ? data : (data.items || data);
+          }
+          state.all = Array.isArray(js) ? js : [];
+          state.page = 0;
+          render();
+          $('#msg').textContent = state.all.length ? '' : 'Kayıt bulunamadı.';
+        } catch (e) {
+          $('#msg').textContent = 'Hata: ' + (e?.message || e);
+          state.all = [];
+          render();
+        }
+      }
+
+      // olaylar
+      document.addEventListener('DOMContentLoaded', () => {
+        $('#btnReload').addEventListener('click', load);
+        $('#fTake').addEventListener('change', () => { state.page = 0; load(); });
+        ['#fQ','#fFrom','#fTo'].forEach(s => $(s).addEventListener('keydown', e => { if (e.key==='Enter') { state.page = 0; render(); }}));
+        $('#fStatus').addEventListener('change', () => { state.page = 0; render(); });
+
+        $('#prev').addEventListener('click', () => { if (state.page>0){ state.page--; render(); } });
+        $('#next').addEventListener('click', () => { state.page++; render(); });
+
+        $('#btnCsv').addEventListener('click', () => {
+          const rows = filterLocal(state.all);
+          const csv = toCsv(rows);
+          download(`orders_${new Date().toISOString().substring(0,10)}.csv`, csv);
+        });
+
+        load();
+      });
+
+      // global (örnek detay aksiyonu)
+      window.details = (id) => alert(`Sipariş #${id} detay… (buraya modal/redirect eklenebilir)`);
+    })();
+</script>

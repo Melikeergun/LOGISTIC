@@ -1,0 +1,31 @@
+﻿@{
+    Layout = "_Layout";
+}
+<section class="card">
+    <h2>Dağıtım Listem</h2>
+    <div id="none" class="muted" style="display:none">Bugün için rota yok.</div>
+    <table id="tbl" style="width:100%;display:none">
+        <thead><tr><th>No</th><th>Müşteri</th><th>Adres</th><th>Sipariş</th><th>Plan</th><th>Durum</th><th>Onay</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</section>
+<script>
+    async function load(){
+      const r = await fetch('/api/driver/myroute',{credentials:'include'});
+      const js = await r.json();
+      if(js.message==='no_route'){ none.style.display='block'; return; }
+      tbl.style.display='table';
+      tbl.querySelector('tbody').innerHTML = js.stops.map(s=>`<tr>
+        <td>${s.stopNo}</td><td>${s.customer}</td><td>${s.address}</td><td>${s.orderId??'-'}</td>
+        <td>${s.plannedTime?new Date(s.plannedTime).toLocaleTimeString(): '-'}</td>
+        <td>${s.status}</td>
+        <td>
+          <button class="btn" onclick="ok(${s.id})">Teslim</button>
+          <button class="btn" onclick="ret(${s.id})">İade</button>
+        </td>
+      </tr>`).join('');
+    }
+    async function ok(id){ await fetch('/api/driver/stops/'+id+'/confirm',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'Delivered',proofCode:'PIN'})}); load(); }
+    async function ret(id){ await fetch('/api/driver/stops/'+id+'/confirm',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'Returned'})}); load(); }
+    document.addEventListener('DOMContentLoaded', load);
+</script>

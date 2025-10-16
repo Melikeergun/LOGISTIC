@@ -1,0 +1,88 @@
+﻿@{
+    Layout = "_Layout";
+    ViewBag.Title = "Gösterge Paneli";
+}
+<section class="page-hero">
+    <h1>📊 Gösterge Paneli</h1>
+    <p>Genel durum, işlem özetleri ve hızlı metrikler.</p>
+</section>
+
+<section class="app-container" style="display:grid;gap:14px">
+    <!-- KPI Kutuları -->
+    <div class="grid-3">
+        <div class="card"><h3>Depo Görevi</h3><div id="kpiTasks" style="font-size:34px;font-weight:800">—</div></div>
+        <div class="card"><h3>Rota</h3><div id="kpiRoutes" style="font-size:34px;font-weight:800">—</div></div>
+        <div class="card"><h3>Satın Alma</h3><div id="kpiPurchases" style="font-size:34px;font-weight:800">—</div></div>
+    </div>
+
+    <div class="grid-3">
+        <div class="card"><h3>CRM Risk</h3><div id="kpiRisks" style="font-size:34px;font-weight:800">—</div></div>
+        <div class="card"><h3>ASN</h3><div id="kpiAsn" style="font-size:34px;font-weight:800">—</div></div>
+        <div class="card"><h3>Dinamik Sipariş</h3><div id="kpiOrders" style="font-size:34px;font-weight:800">—</div></div>
+    </div>
+
+    <!-- Son olaylar / notlar -->
+    <div class="card">
+        <h3>Aktivite Günlüğü</h3>
+        <p class="muted" id="logMsg">Son kayıtlar yükleniyor…</p>
+        <ul id="logList" style="margin:0;padding-left:18px;"></ul>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        (() => {
+          const $ = (s) => document.querySelector(s);
+
+          async function loadStats(){
+            try{
+              const r = await fetch('/api/admin/stats', { credentials:'include' });
+              if(!r.ok) throw new Error('HTTP ' + r.status);
+              const s = await r.json();
+
+              $('#kpiTasks').textContent = (s?.tasks ?? 0).toLocaleString('tr-TR');
+              $('#kpiRoutes').textContent = (s?.routes ?? 0).toLocaleString('tr-TR');
+              $('#kpiPurchases').textContent = (s?.purchases ?? 0).toLocaleString('tr-TR');
+              $('#kpiRisks').textContent = (s?.risks ?? 0).toLocaleString('tr-TR');
+              $('#kpiAsn').textContent = (s?.asn ?? 0).toLocaleString('tr-TR');
+              $('#kpiOrders').textContent = (s?.orders ?? 0).toLocaleString('tr-TR');
+            }catch(e){
+              // Statik fallback
+              $('#kpiTasks').textContent = '18';
+              $('#kpiRoutes').textContent = '34';
+              $('#kpiPurchases').textContent = '12';
+              $('#kpiRisks').textContent = '5';
+              $('#kpiAsn').textContent = '7';
+              $('#kpiOrders').textContent = '1200';
+            }
+          }
+
+          async function loadLog(){
+            try{
+              const r = await fetch('/api/admin/activity?take=8', { credentials:'include' });
+              if(!r.ok) throw new Error('HTTP ' + r.status);
+              const data = await r.json();
+              const items = Array.isArray(data) ? data : (data?.items || []);
+              if(!items.length){ $('#logMsg').textContent = 'Kayıt yok.'; return; }
+              $('#logMsg').remove();
+              $('#logList').innerHTML = items.map(x => (
+                `<li>${(x.time||'').toString().replace('T',' ').substring(0,16)} • ${x.text || x.message || '-'}</li>`
+              )).join('');
+            }catch(e){
+              $('#logMsg').textContent = 'API okunamadı; örnek kayıtlar gösteriliyor.';
+              $('#logList').innerHTML = [
+                '2025-09-03 09:41 • 3 yeni rota oluşturuldu.',
+                '2025-09-03 10:12 • 2 depo görevi tamamlandı.',
+                '2025-09-03 11:30 • ASN oluşturuldu.',
+                '2025-09-03 14:05 • 1 iade talebi onaylandı.'
+              ].map(t=>`<li>${t}</li>`).join('');
+            }
+          }
+
+          document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadLog();
+          });
+        })();
+    </script>
+}
